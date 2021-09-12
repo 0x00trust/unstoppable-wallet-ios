@@ -38,6 +38,10 @@ $ rustup target add aarch64-apple-ios x86_64-apple-ios
 $ brew install sourcery
 ```
 
+```
+pod install
+```
+
 4. Open in Xcode and run.
  
 
