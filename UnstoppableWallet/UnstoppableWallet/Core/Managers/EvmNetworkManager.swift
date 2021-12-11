@@ -1,9 +1,9 @@
 import EthereumKit
 
 class EvmNetworkManager {
-    private let appConfigProvider: IAppConfigProvider
+    private let appConfigProvider: AppConfigProvider
 
-    init(appConfigProvider: IAppConfigProvider) {
+    init(appConfigProvider: AppConfigProvider) {
         self.appConfigProvider = appConfigProvider
     }
 
@@ -49,10 +49,10 @@ extension EvmNetworkManager {
         let networks: [EvmNetwork?] = [
             defaultWebsocketNetwork(name: "MainNet Websocket", networkType: .ethMainNet),
             defaultHttpNetwork(name: "MainNet HTTP", networkType: .ethMainNet),
-            defaultWebsocketNetwork(name: "Ropsten", networkType: .ropsten),
-            defaultWebsocketNetwork(name: "Rinkeby", networkType: .rinkeby),
-            defaultWebsocketNetwork(name: "Kovan", networkType: .kovan),
-            defaultWebsocketNetwork(name: "Goerli", networkType: .goerli)
+//            defaultWebsocketNetwork(name: "Ropsten", networkType: .ropsten),
+//            defaultWebsocketNetwork(name: "Rinkeby", networkType: .rinkeby),
+//            defaultWebsocketNetwork(name: "Kovan", networkType: .kovan),
+//            defaultWebsocketNetwork(name: "Goerli", networkType: .goerli)
         ]
 
         // todo: load custom network from DB

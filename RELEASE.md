@@ -2,12 +2,18 @@
 
 This document describes the release process for `Unstoppable` app.
 
-### 1. Update Checkpoints
+### 1. Prepare dependent libraries
+
+#### 1.1. Update Checkpoints
 
 * `BitcoinKit.swift`
 * `BitcoinCashKit.swift`
 * `LitecoinKit.swift`
 * `DashKit.swift`
+
+#### 1.2. Update coins dump in `MarketKit`
+
+Initial coins dump `json` file should be updated to latest state of backend.
 
 ### 2. Release All Dependencies
 
@@ -16,7 +22,7 @@ The following dependency pods should be released if there were any changes in th
 * https://github.com/horizontalsystems/bitcoin-kit-ios
 * https://github.com/horizontalsystems/ethereum-kit-ios
 * https://github.com/horizontalsystems/binance-chain-kit-ios
-* https://github.com/horizontalsystems/xrates-kit-ios
+* https://github.com/horizontalsystems/market-kit-ios
 * https://github.com/horizontalsystems/blockchain-fee-rate-kit-ios
 
 #### 2.1. Release pod if required
@@ -36,7 +42,7 @@ $ pod update PodNameHere
 
 ### 3. Transfer Code to Production Branch
 
-Merge `version` branch into `master` branch
+Merge `version` branch into `master` branch. After this `Github Actions` will build release version and upload it to `TestFlight`.
 
 ### 4. Prepare New Development Branch
 
@@ -48,13 +54,7 @@ $ git branch version/0.1
 
 * Increase app version in project
 
-### 5. Upload Build to App Store
-
-* Apply release credentials to `Production.xcconfig`
-* Check validity of URLs set for `guides_index_url` and `faq_index_url` parameters in `Production.xcconfig`
-* Build and upload to `ITunesConnect`
-
-### 6. Prepare Release in GitHub Repository
+### 5. Prepare Release in GitHub Repository
 
 * Create tag for current version
 * Create `Release` and add changelog

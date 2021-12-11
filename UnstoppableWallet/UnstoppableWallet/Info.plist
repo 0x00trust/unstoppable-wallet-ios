@@ -2,10 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>HsProviderApiKey</key>
+	<string>$(hs_provider_api_key)</string>
 	<key>BscscanApiKey</key>
 	<string>${bscscan_api_key}</string>
-	<key>BtcCoreRpcUrl</key>
-	<string>${btc_core_rpc_url}</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleExecutable</key>
@@ -35,26 +35,14 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>CoinMarketCapKey</key>
-	<string>$(coinmarketcap_com_api_key)</string>
-	<key>CoinsUrl</key>
-	<string>$(coins_url)</string>
 	<key>CryptoCompareApiKey</key>
 	<string>$(cryptocompare_com_api_key)</string>
-	<key>DefiYieldApiKey</key>
-	<string>$(defiyield_api_key)</string>
 	<key>DefaultWords</key>
 	<string>${default_words}</string>
-	<key>DefaultWords12</key>
-	<string>${default_words_12}</string>
-	<key>DefaultWords24</key>
-	<string>${default_words_24}</string>
+	<key>DefiYieldApiKey</key>
+	<string>$(defiyield_api_key)</string>
 	<key>EtherscanApiKey</key>
 	<string>${etherscan_api_key}</string>
-	<key>FaqIndexUrl</key>
-	<string>${faq_index_url}</string>
-	<key>GuidesIndexUrl</key>
-	<string>${guides_index_url}</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>InfuraProjectId</key>
@@ -69,6 +57,8 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>MarketApiUrl</key>
+	<string>${market_api_url}</string>
 	<key>NSCameraUsageDescription</key>
 	<string>We need access to camera to scan QR codes.</string>
 	<key>NSFaceIDUsageDescription</key>
@@ -77,14 +67,12 @@
 	<string>We need access to local network to discover blockchain nodes</string>
 	<key>OfficeMode</key>
 	<string>${OfficeMode}</string>
-	<key>ProviderCoinsUrl</key>
-	<string>$(provider_coins_url)</string>
-	<key>Sandbox</key>
-	<string>${Sandbox}</string>
 	<key>ShowBuildNumber</key>
 	<string>${ShowBuildNumber}</string>
 	<key>TestMode</key>
 	<string>${TestMode}</string>
+	<key>TwitterBearerToken</key>
+	<string>${twitter_bearer_token}</string>
 	<key>UIBackgroundModes</key>
 	<array/>
 	<key>UILaunchStoryboardName</key>
@@ -101,7 +89,5 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
-	<key>UniswapGraphUrl</key>
-	<string>$(uniswap_graph_url)</string>
 </dict>
 </plist>
