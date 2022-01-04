@@ -218,6 +218,18 @@ class EvmTransactionConverter {
                     foreignRecipient: decoration.recipient != evmKit.address
             )
 
+        case let decoration as OneInchMethodDecoration:
+            return UnknownSwapTransactionRecord(
+                    source: source,
+                    fullTransaction: fullTransaction,
+                    baseCoin: baseCoin,
+                    exchangeAddress: to.eip55,
+                    value: convertAmount(amount: fullTransaction.transaction.value, decimals: baseCoin.decimals, sign: .minus),
+                    incomingInternalETHs: internalTransactions(from: fullTransaction),
+                    incomingEip20Events: incomingEip20Events(from: fullTransaction),
+                    outgoingEip20Events: outgoingEip20Events(from: fullTransaction)
+            )
+
         case let decoration as RecognizedMethodDecoration:
             return ContractCallTransactionRecord(
                     source: source,
@@ -257,7 +269,7 @@ class EvmTransactionConverter {
                         source: source,
                         fullTransaction: fullTransaction,
                         baseCoin: baseCoin,
-                        from: decoration.to.eip55,
+                        from: fullTransaction.transaction.from.eip55,
                         value: eip20Value(tokenAddress: to, value: decoration.value, sign: .plus),
                         foreignTransaction: true
                 )
@@ -277,7 +289,7 @@ class EvmTransactionConverter {
                     foreignTransaction: true
             )
 
-        case is UnknownMethodDecoration:
+        case is UnknownMethodDecoration, is OneInchMethodDecoration:
             return ContractCallTransactionRecord(
                     source: source,
                     fullTransaction: fullTransaction,
