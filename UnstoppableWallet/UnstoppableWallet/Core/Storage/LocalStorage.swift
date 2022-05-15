@@ -7,7 +7,7 @@ class LocalStorage {
     private let biometricOnKey = "biometric_on_key"
     private let lastExitDateKey = "last_exit_date_key"
     private let keySendInputType = "amount-type-switch-service-amount-type"
-    private let keyChartType = "chart_type_key"
+    private let keyChartInterval = "chart_type_key"
     private let mainShownOnceKey = "main_shown_once_key"
     private let jailbreakShownOnceKey = "jailbreak_shown_once_key"
     private let debugLogKey = "debug_log_key"
@@ -92,30 +92,30 @@ extension LocalStorage: ILocalStorage {
         set { storage.set(value: newValue, for: keyZCashRewind) }
     }
 
-    func defaultProvider(blockchain: SwapModule.Dex.Blockchain) -> SwapModule.Dex.Provider {
-        let key = [keyDefaultProvider, blockchain.rawValue, blockchain.isMainNet.description].joined(separator: "|")
+    func defaultProvider(blockchain: EvmBlockchain) -> SwapModule.Dex.Provider {
+        let key = [keyDefaultProvider, blockchain.rawValue].joined(separator: "|")
         let raw: String? = storage.value(for: key)
         return (raw.flatMap { SwapModule.Dex.Provider(rawValue: $0) }) ?? blockchain.allowedProviders[0]
     }
 
-    func setDefaultProvider(blockchain: SwapModule.Dex.Blockchain, provider: SwapModule.Dex.Provider) {
-        let key = [keyDefaultProvider, blockchain.rawValue, blockchain.isMainNet.description].joined(separator: "|")
+    func setDefaultProvider(blockchain: EvmBlockchain, provider: SwapModule.Dex.Provider) {
+        let key = [keyDefaultProvider, blockchain.rawValue].joined(separator: "|")
         storage.set(value: provider.rawValue, for: key)
     }
 
 }
 
-extension LocalStorage: IChartTypeStorage {
+extension LocalStorage: IChartIntervalStorage {
 
-    var chartType: ChartType? {
+    var interval: HsTimePeriod? {
         get {
-            if let rawValue: Int = storage.value(for: keyChartType), let type = ChartType(rawValue: rawValue) {
-                return type
+            if let rawValue: String = storage.value(for: keyChartInterval), let interval = HsTimePeriod(rawValue: rawValue) {
+                return interval
             }
             return nil
         }
         set {
-            storage.set(value: newValue?.rawValue, for: keyChartType)
+            storage.set(value: newValue?.rawValue, for: keyChartInterval)
         }
     }
 

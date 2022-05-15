@@ -40,8 +40,8 @@ class ManageWalletsService {
         subscribe(disposeBag, enableCoinService.enableCoinObservable) { [weak self] configuredPlatformsCoins, restoreSettings in
             self?.handleEnableCoin(configuredPlatformCoins: configuredPlatformsCoins, restoreSettings: restoreSettings)
         }
-        subscribe(disposeBag, enableCoinService.cancelEnableCoinObservable) { [weak self] coin in
-            self?.handleCancelEnable(coin: coin)
+        subscribe(disposeBag, enableCoinService.cancelEnableCoinObservable) { [weak self] fullCoin in
+            self?.handleCancelEnable(fullCoin: fullCoin)
         }
 
         sync(wallets: walletManager.activeWallets)
@@ -78,9 +78,9 @@ class ManageWalletsService {
         self.wallets = Set(wallets)
     }
 
-    private func hasSettingsOrPlatforms(fullCoin: FullCoin) -> Bool {
-        if fullCoin.platforms.count == 1 {
-            let platform = fullCoin.platforms[0]
+    private func hasSettingsOrPlatforms(supportedPlatforms: [Platform]) -> Bool {
+        if supportedPlatforms.count == 1 {
+            let platform = supportedPlatforms[0]
             return !platform.coinType.coinSettingTypes.isEmpty
         } else {
             return true
@@ -88,17 +88,16 @@ class ManageWalletsService {
     }
 
     private func item(fullCoin: FullCoin) -> Item {
-        let supportedPlatforms = fullCoin.platforms.filter { $0.coinType.isSupported }
-
+        let supportedPlatforms = fullCoin.supportedPlatforms
         let fullCoin = FullCoin(coin: fullCoin.coin, platforms: supportedPlatforms)
 
         let itemState: ItemState
 
-        if fullCoin.platforms.isEmpty {
+        if supportedPlatforms.isEmpty {
             itemState = .unsupported
         } else {
             let enabled = isEnabled(coin: fullCoin.coin)
-            itemState = .supported(enabled: enabled, hasSettings: enabled && hasSettingsOrPlatforms(fullCoin: fullCoin))
+            itemState = .supported(enabled: enabled, hasSettings: enabled && hasSettingsOrPlatforms(supportedPlatforms: supportedPlatforms))
         }
 
         return Item(fullCoin: fullCoin, state: itemState)
@@ -143,9 +142,9 @@ class ManageWalletsService {
         }
     }
 
-    private func handleCancelEnable(coin: Coin) {
-        if !isEnabled(coin: coin) {
-            cancelEnableCoinRelay.accept(coin)
+    private func handleCancelEnable(fullCoin: FullCoin) {
+        if !isEnabled(coin: fullCoin.coin) {
+            cancelEnableCoinRelay.accept(fullCoin.coin)
         }
     }
 
@@ -169,17 +168,25 @@ extension ManageWalletsService {
         syncState()
     }
 
-    func enable(fullCoin: FullCoin) {
+    func enable(uid: String) {
+        guard let fullCoin = fullCoins.first(where: { $0.coin.uid == uid }) else {
+            return
+        }
+
         enableCoinService.enable(fullCoin: fullCoin, account: account)
     }
 
-    func disable(coin: Coin) {
-        let walletsToDelete = wallets.filter { $0.coin == coin }
+    func disable(uid: String) {
+        let walletsToDelete = wallets.filter { $0.coin.uid == uid }
         walletManager.delete(wallets: Array(walletsToDelete))
     }
 
-    func configure(fullCoin: FullCoin) {
-        let coinWallets = wallets.filter { $0.coin == fullCoin.coin }
+    func configure(uid: String) {
+        guard let fullCoin = fullCoins.first(where: { $0.coin.uid == uid }) else {
+            return
+        }
+
+        let coinWallets = wallets.filter { $0.coin.uid == uid }
         enableCoinService.configure(fullCoin: fullCoin, configuredPlatformCoins: coinWallets.map { $0.configuredPlatformCoin })
     }
 

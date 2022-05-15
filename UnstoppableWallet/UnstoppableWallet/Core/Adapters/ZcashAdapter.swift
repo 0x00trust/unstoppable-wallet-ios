@@ -9,7 +9,7 @@ import MarketKit
 class ZcashAdapter {
     private let disposeBag = DisposeBag()
 
-    private static let coinRate = Decimal(ZcashSDK.ZATOSHI_PER_ZEC)
+    private static let coinRate = Decimal(ZcashSDK.zatoshiPerZEC)
     var fee: Decimal { defaultFee() }
 
     private let coin: PlatformCoin
@@ -63,16 +63,16 @@ class ZcashAdapter {
         case .created: birthday = Self.newBirthdayHeight(network: network)
         case .restored:
             if let height = restoreSettings.birthdayHeight {
-                birthday = WalletBirthday.birthday(with: max(height, network.constants.SAPLING_ACTIVATION_HEIGHT),network: network).height
+                birthday = WalletBirthday.birthday(with: max(height, network.constants.saplingActivationHeight),network: network).height
             } else {
-                birthday = network.constants.SAPLING_ACTIVATION_HEIGHT
+                birthday = network.constants.saplingActivationHeight
             }
         }
-        
+
         let seedData = [UInt8](seed)
         let derivationTool = DerivationTool(networkType: network.networkType)
         let unifiedViewingKeys = try derivationTool.deriveUnifiedViewingKeysFromSeed(seedData, numberOfAccounts: 1)
-        
+
         guard let uvk = unifiedViewingKeys.first,
               let ua = try? derivationTool.deriveUnifiedAddressFromUnifiedViewingKey(uvk) else {
             throw AppError.ZcashError.noReceiveAddress
@@ -92,12 +92,12 @@ class ZcashAdapter {
                 loggerProxy: loggingProxy)
 
 
-        
+
         try initializer.initialize()
         keys = try derivationTool.deriveSpendingKeys(seed: seedData, numberOfAccounts: 1)
-        
+
         synchronizer = try SDKSynchronizer(initializer: initializer)
-        
+
         try synchronizer.prepare()
 
         transactionPool = ZcashTransactionPool(receiveAddress: address.zAddress)
@@ -224,7 +224,7 @@ class ZcashAdapter {
                     transactionHash: transaction.transactionHash,
                     transactionIndex: transaction.transactionIndex,
                     blockHeight: transaction.minedHeight,
-                    confirmationsThreshold: ZcashSDK.DEFAULT_REWIND_DISTANCE,
+                    confirmationsThreshold: ZcashSDK.defaultRewindDistance,
                     date: Date(timeIntervalSince1970: Double(transaction.timestamp)),
                     fee: defaultFee(height: transaction.minedHeight),
                     failed: transaction.failed,
@@ -243,7 +243,7 @@ class ZcashAdapter {
                     transactionHash: transaction.transactionHash,
                     transactionIndex: transaction.transactionIndex,
                     blockHeight: transaction.minedHeight,
-                    confirmationsThreshold: ZcashSDK.DEFAULT_REWIND_DISTANCE,
+                    confirmationsThreshold: ZcashSDK.defaultRewindDistance,
                     date: Date(timeIntervalSince1970: Double(transaction.timestamp)),
                     fee: defaultFee(height: transaction.minedHeight),
                     failed: transaction.failed,
@@ -259,11 +259,11 @@ class ZcashAdapter {
     }
 
     static private var cloudSpendParamsURL: URL? {
-        URL(string: ZcashSDK.CLOUD_PARAM_DIR_URL + ZcashSDK.SPEND_PARAM_FILE_NAME)
+        URL(string: ZcashSDK.cloudParameterURL + ZcashSDK.spendParamFilename)
     }
 
     static private var cloudOutputParamsURL: URL? {
-        URL(string: ZcashSDK.CLOUD_PARAM_DIR_URL + ZcashSDK.OUTPUT_PARAM_FILE_NAME)
+        URL(string: ZcashSDK.cloudParameterURL + ZcashSDK.outputParamFilename)
     }
 
     private func saplingDataExist() -> Bool {
@@ -354,15 +354,15 @@ extension ZcashAdapter {
     }
 
     private static func cacheDbURL(uniqueId: String, network: ZcashNetwork) throws -> URL {
-        try dataDirectoryUrl().appendingPathComponent(network.constants.DEFAULT_DB_NAME_PREFIX + uniqueId + ZcashSDK.DEFAULT_CACHES_DB_NAME, isDirectory: false)
+        try dataDirectoryUrl().appendingPathComponent(network.constants.defaultDbNamePrefix + uniqueId + ZcashSDK.defaultCacheDbName, isDirectory: false)
     }
 
     private static func dataDbURL(uniqueId: String, network: ZcashNetwork) throws -> URL {
-        try dataDirectoryUrl().appendingPathComponent(network.constants.DEFAULT_DB_NAME_PREFIX + uniqueId + ZcashSDK.DEFAULT_DATA_DB_NAME, isDirectory: false)
+        try dataDirectoryUrl().appendingPathComponent(network.constants.defaultDbNamePrefix + uniqueId + ZcashSDK.defaultDataDbName, isDirectory: false)
     }
 
     private static func pendingDbURL(uniqueId: String, network: ZcashNetwork) throws -> URL {
-        try dataDirectoryUrl().appendingPathComponent(network.constants.DEFAULT_DB_NAME_PREFIX + uniqueId + ZcashSDK.DEFAULT_PENDING_DB_NAME, isDirectory: false)
+        try dataDirectoryUrl().appendingPathComponent(network.constants.defaultDbNamePrefix + uniqueId + ZcashSDK.defaultPendingDbName, isDirectory: false)
     }
 
     private static func spendParamsURL(uniqueId: String) throws -> URL {
@@ -526,17 +526,17 @@ extension ZcashAdapter: ISendZcashAdapter {
     }
 
     func validate(address: String) throws -> AddressType {
-        
+
         guard address != receiveAddress else {
             throw AppError.addressInvalid
         }
 
         do {
             let derivationTool = DerivationTool(networkType: self.network.networkType)
-            
+
             let validZAddress = try derivationTool.isValidShieldedAddress(address)
             let validTAddress = try derivationTool.isValidTransparentAddress(address)
-            
+
             guard validZAddress || validTAddress else {
                 throw AppError.addressInvalid
             }

@@ -4,7 +4,7 @@ import MarketKit
 
 class CoinPlatformsService {
     private let approvePlatformsRelay = PublishRelay<CoinWithPlatforms>()
-    private let rejectApprovePlatformsRelay = PublishRelay<Coin>()
+    private let rejectApprovePlatformsRelay = PublishRelay<FullCoin>()
 
     private let requestRelay = PublishRelay<Request>()
 }
@@ -15,7 +15,7 @@ extension CoinPlatformsService {
         approvePlatformsRelay.asObservable()
     }
 
-    var rejectApprovePlatformsObservable: Observable<Coin> {
+    var rejectApprovePlatformsObservable: Observable<FullCoin> {
         rejectApprovePlatformsRelay.asObservable()
     }
 
@@ -24,8 +24,10 @@ extension CoinPlatformsService {
     }
 
     func approvePlatforms(fullCoin: FullCoin, currentPlatforms: [Platform] = []) {
-        guard fullCoin.platforms.count > 1 else {
-            approvePlatformsRelay.accept(CoinWithPlatforms(coin: fullCoin.coin, platforms: fullCoin.platforms))
+        let supportedPlatforms = fullCoin.supportedPlatforms
+
+        guard supportedPlatforms.count > 1 else {
+            approvePlatformsRelay.accept(CoinWithPlatforms(coin: fullCoin.coin, platforms: supportedPlatforms))
             return
         }
 
@@ -38,8 +40,8 @@ extension CoinPlatformsService {
         approvePlatformsRelay.accept(coinWithPlatforms)
     }
 
-    func cancel(coin: Coin) {
-        rejectApprovePlatformsRelay.accept(coin)
+    func cancel(fullCoin: FullCoin) {
+        rejectApprovePlatformsRelay.accept(fullCoin)
     }
 
 }

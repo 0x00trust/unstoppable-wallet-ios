@@ -121,7 +121,7 @@ class FilterHeaderView: UITableViewHeaderFooterView {
                 .map { IndexedWidth(index: $0, width: FilterHeaderCell.width(for: title(index: $0), buttonStyle: buttonStyle)) }
 
         let initialItemWidth = items.reduce(0) { $0 + $1.width }
-        if initialItemWidth >= width {     // elements cant fit into screen
+        if initialItemWidth >= width {     // elements can't fit into screen
             itemWidths = items.map { $0.width }
             return
         }
@@ -223,7 +223,7 @@ extension FilterHeaderView: UICollectionViewDelegateFlowLayout, UICollectionView
     }
 
     private func handleSelected(indexPath: IndexPath) {
-        guard let selectedCell = collectionView.cellForItem(at: indexPath) else {
+        guard collectionView.cellForItem(at: indexPath) != nil else {
             return
         }
         layoutSelectedView(indexPath: indexPath)

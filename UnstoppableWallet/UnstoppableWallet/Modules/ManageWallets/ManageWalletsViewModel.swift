@@ -28,7 +28,18 @@ class ManageWalletsViewModel {
         case .unsupported: viewItemState = .toggleHidden
         }
 
-        return CoinToggleViewModel.ViewItem(fullCoin: item.fullCoin, state: viewItemState)
+        let supportedPlatforms = item.fullCoin.supportedPlatforms
+        let blockchainBadge = supportedPlatforms.count == 1 ? item.fullCoin.supportedPlatforms.first?.coinType.blockchainType : nil
+
+        return CoinToggleViewModel.ViewItem(
+                uid: item.fullCoin.coin.uid,
+                imageUrl: item.fullCoin.coin.imageUrl,
+                placeholderImageName: item.fullCoin.placeholderImageName,
+                title: item.fullCoin.coin.name,
+                subtitle: item.fullCoin.coin.code,
+                state: viewItemState,
+                blockchainBadge: blockchainBadge
+        )
     }
 
     private func sync(items: [ManageWalletsService.Item]) {
@@ -44,16 +55,16 @@ extension ManageWalletsViewModel: ICoinToggleViewModel {
         viewItemsRelay.asDriver()
     }
 
-    func onEnable(fullCoin: FullCoin) {
-        service.enable(fullCoin: fullCoin)
+    func onEnable(uid: String) {
+        service.enable(uid: uid)
     }
 
-    func onDisable(coin: Coin) {
-        service.disable(coin: coin)
+    func onDisable(uid: String) {
+        service.disable(uid: uid)
     }
 
-    func onTapSettings(fullCoin: FullCoin) {
-        service.configure(fullCoin: fullCoin)
+    func onTapSettings(uid: String) {
+        service.configure(uid: uid)
     }
 
     func onUpdate(filter: String) {

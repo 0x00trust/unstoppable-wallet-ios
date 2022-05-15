@@ -54,14 +54,12 @@ struct Wallet {
             blockchain = .zcash
         case .bep2(let symbol):
             blockchain = .bep2(symbol: symbol)
-        case .ethereum:
-            blockchain = .ethereum
-        case .binanceSmartChain:
-            blockchain = .binanceSmartChain
-        case .erc20:
-            blockchain = .ethereum
-        case .bep20:
-            blockchain = .binanceSmartChain
+        case .ethereum, .erc20:
+            blockchain = .evm(blockchain: .ethereum)
+        case .binanceSmartChain, .bep20:
+            blockchain = .evm(blockchain: .binanceSmartChain)
+        case .polygon, .mrc20:
+            blockchain = .evm(blockchain: .polygon)
         default:
             fatalError("Unsupported coin may not have transactions to show")
         }

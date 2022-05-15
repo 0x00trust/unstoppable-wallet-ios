@@ -7,18 +7,23 @@ struct UniswapSettingsModule {
         guard let ethereumPlatformCoin = try? App.shared.marketKit.platformCoin(coinType: .ethereum) else {
             return nil
         }
-        let chainCoinCode = tradeService.platformCoinIn.flatMap { AddressResolutionService.chainCoinCode(coinType: $0.coinType) } ?? ethereumPlatformCoin.code
+        let platformCoin = tradeService.platformCoinIn
 
-        let addressParserFactory = AddressParserFactory()
+        let coinCode = platformCoin?.code ?? ethereumPlatformCoin.code
+        let chainCoinCode = platformCoin.flatMap { UDNAddressParserItem.chainCoinCode(coinType: $0.platform.coinType) }
+        let chain = platformCoin.flatMap { UDNAddressParserItem.chain(coinType: $0.platform.coinType) }
 
-        let service = UniswapSettingsService(tradeOptions: tradeService.settings)
+        let addressParserChain = AddressParserChain()
+                .append(handler: EvmAddressParser())
+                .append(handler: UDNAddressParserItem(coinCode: coinCode, platformCoinCode: chainCoinCode, chain: chain))
+
+        let addressUriParser = AddressParserFactory.parser(coinType: ethereumPlatformCoin.coinType)
+        let addressService = AddressService(addressUriParser: addressUriParser, addressParserChain: addressParserChain, initialAddress: tradeService.settings.recipient)
+
+        let service = UniswapSettingsService(tradeOptions: tradeService.settings, addressService: addressService)
         let viewModel = UniswapSettingsViewModel(service: service, tradeService: tradeService, decimalParser: AmountDecimalParser())
 
-        let recipientViewModel = RecipientAddressViewModel(
-                service: service,
-                resolutionService: AddressResolutionService(coinCode: chainCoinCode, chain: nil),
-                addressParser: addressParserFactory.parser(coinType: ethereumPlatformCoin.coinType)
-        )
+        let recipientViewModel = RecipientAddressViewModel(service: addressService, handlerDelegate: nil)
         let slippageViewModel = SwapSlippageViewModel(service: service, decimalParser: AmountDecimalParser())
         let deadlineViewModel = SwapDeadlineViewModel(service: service, decimalParser: AmountDecimalParser())
 

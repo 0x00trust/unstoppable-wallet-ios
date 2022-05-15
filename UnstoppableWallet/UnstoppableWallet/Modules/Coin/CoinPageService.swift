@@ -48,22 +48,20 @@ class CoinPageService {
         favorite = favoritesManager.isFavorite(coinUid: fullCoin.coin.uid)
     }
 
-    private var supportedPlatforms: [Platform] {
-        fullCoin.platforms.filter { $0.coinType.isSupported }
-    }
-
     private var enabledWallets: [Wallet] {
-        let platforms = supportedPlatforms
+        let platforms = fullCoin.supportedPlatforms
         return walletManager.activeWallets.filter { platforms.contains($0.platform) }
     }
 
     private func syncWalletState() {
-        guard accountManager.activeAccount != nil else {
+        guard let activeAccount = accountManager.activeAccount else {
             walletState = .noActiveAccount
             return
         }
 
-        if supportedPlatforms.isEmpty {
+        if activeAccount.watchAccount {
+            walletState = .watchAccount
+        } else if fullCoin.supportedPlatforms.isEmpty {
             walletState = .unsupported
         } else {
             walletState = .supported(added: !enabledWallets.isEmpty)
@@ -117,6 +115,7 @@ extension CoinPageService {
 
     enum WalletState {
         case noActiveAccount
+        case watchAccount
         case unsupported
         case supported(added: Bool)
     }

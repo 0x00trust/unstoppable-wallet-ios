@@ -19,16 +19,16 @@ def appPods
   pod 'BitcoinCore.swift', git: 'https://github.com/horizontalsystems/bitcoin-kit-ios.git'
   # pod 'BitcoinCore.swift', path: '../bitcoin-kit-ios/'
 
-  pod 'ZcashLightClientKit', :git => 'https://github.com/zcash/ZcashLightClientKit', :tag => '0.12.0-beta.2'
+  pod 'ZcashLightClientKit', :git => 'https://github.com/zcash/ZcashLightClientKit', :tag => '0.12.0-beta.6'
 #  pod 'ZcashLightClientKit', path: '../ZcashLightClientKit'
 
-  pod 'EthereumKit.swift', git: 'https://github.com/horizontalsystems/ethereum-kit-ios', branch: 'version/0.23'
+  pod 'EthereumKit.swift', git: 'https://github.com/horizontalsystems/ethereum-kit-ios'
   # pod 'EthereumKit.swift', path: '../ethereum-kit-ios/'
-  pod 'Erc20Kit.swift', git: 'https://github.com/horizontalsystems/ethereum-kit-ios', branch: 'version/0.23'
+  pod 'Erc20Kit.swift', git: 'https://github.com/horizontalsystems/ethereum-kit-ios'
   # pod 'Erc20Kit.swift', path: '../ethereum-kit-ios/'
-  pod 'UniswapKit.swift', git: 'https://github.com/horizontalsystems/ethereum-kit-ios', branch: 'version/0.23'
+  pod 'UniswapKit.swift', git: 'https://github.com/horizontalsystems/ethereum-kit-ios'
   # pod 'UniswapKit.swift', :path => '../ethereum-kit-ios'
-  pod 'OneInchKit.swift', git: 'https://github.com/horizontalsystems/ethereum-kit-ios', branch: 'version/0.23'
+  pod 'OneInchKit.swift', git: 'https://github.com/horizontalsystems/ethereum-kit-ios'
   # pod 'OneInchKit.swift', :path => '../ethereum-kit-ios'
 
   pod 'BinanceChainKit.swift', git: 'https://github.com/horizontalsystems/binance-chain-kit-ios'
@@ -90,8 +90,7 @@ def appPods
   pod 'WalletConnect', git: 'https://github.com/horizontalsystems/wallet-connect-swift'
 
   pod 'EthereumABI', git: 'https://github.com/horizontalsystems/EthereumABI'
-  pod 'Base58Swift', '~> 2.1.10'
-  pod 'UnstoppableDomainsResolution', '~> 2.0.1'
+  pod 'UnstoppableDomainsResolution', '~> 3.0.0'
 end
 
 target 'Unstoppable Dev T' do

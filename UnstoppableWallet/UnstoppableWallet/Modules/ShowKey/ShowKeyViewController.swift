@@ -55,7 +55,7 @@ class ShowKeyViewController: ThemeViewController {
         tableView.separatorStyle = .none
 
         tableView.sectionDataSource = self
-        tableView.registerCell(forClass: DCell.self)
+        tableView.registerCell(forClass: HighlightedDescriptionCell.self)
         tableView.registerCell(forClass: Cell9.self)
         tableView.registerCell(forClass: EmptyCell.self)
         tableView.registerCell(forClass: C9Cell.self)
@@ -107,6 +107,7 @@ class ShowKeyViewController: ThemeViewController {
 
         subscribe(disposeBag, viewModel.openUnlockSignal) { [weak self] in self?.openUnlock() }
         subscribe(disposeBag, viewModel.showKeySignal) { [weak self] in self?.showKey() }
+        subscribe(disposeBag, viewModel.copySignal) { [weak self] in self?.copy(text: $0) }
 
         tableView.buildSections()
     }
@@ -117,6 +118,10 @@ class ShowKeyViewController: ThemeViewController {
 
     @objc private func onTapShowButton() {
         viewModel.onTapShow()
+    }
+
+    private func copy(text: String) {
+        CopyHelper.copyAndNotify(value: text)
     }
 
     private func openUnlock() {
@@ -145,29 +150,31 @@ class ShowKeyViewController: ThemeViewController {
         Row<EmptyCell>(id: id, height: height)
     }
 
-    private func rows(privateKey: ShowKeyViewModel.PrivateKey) -> [RowProtocol] {
-        let viewItem = CopyableSecondaryButton.ViewItem(type: .raw, value: { privateKey.value })
+    private func rows(privateKey: String) -> [RowProtocol] {
+        let viewItem = CopyableSecondaryButton.ViewItem(type: .raw, value: { privateKey })
+        let text = "show_key.private_key.description".localized
 
         return [
-            marginRow(
-                    id: "\(privateKey.blockchain)-margin",
-                    height: .margin12
-            ),
-            Row<DCell>(
-                    id: "\(privateKey.blockchain)-title",
-                    height: .heightCell48,
+            Row<HighlightedDescriptionCell>(
+                    id: "private-key-description",
+                    dynamicHeight: { containerWidth in
+                        HighlightedDescriptionCell.height(containerWidth: containerWidth, text: text)
+                    },
                     bind: { cell, _ in
-                        cell.set(backgroundStyle: .lawrence, isFirst: true)
-                        cell.title = privateKey.blockchain
+                        cell.descriptionText = text
                     }
             ),
+            marginRow(
+                    id: "private-key-margin",
+                    height: .margin4
+            ),
             Row<Cell9>(
-                    id: "\(privateKey.blockchain)-value",
+                    id: "private-key-value",
                     dynamicHeight: { width in
-                        Cell9.height(containerWidth: width, backgroundStyle: .lawrence, viewItem: viewItem)
+                        Cell9.height(containerWidth: width, backgroundStyle: .transparent, viewItem: viewItem)
                     },
                     bind: { [weak self] cell, _ in
-                        cell.set(backgroundStyle: .lawrence, isLast: true)
+                        cell.set(backgroundStyle: .transparent, isFirst: true)
                         cell.viewItem = viewItem
                         cell.handler = { self?.handleTap(viewItem: $0) }
                     }
@@ -178,6 +185,67 @@ class ShowKeyViewController: ThemeViewController {
 }
 
 extension ShowKeyViewController: SectionsDataSource {
+
+    private func headerRow(id: String, text: String) -> RowProtocol {
+        CellBuilder.row(
+                elements: [.text],
+                tableView: tableView,
+                id: id,
+                height: .heightSingleLineCell,
+                bind: { cell in
+                    cell.set(backgroundStyle: .transparent, isFirst: true)
+
+                    cell.bind(index: 0) { (component: TextComponent) in
+                        component.set(style: .c1)
+                        component.text = text.uppercased()
+                    }
+                }
+        )
+    }
+
+    private func copyRow(id: String, title: String, isFirst: Bool, isLast: Bool, onCopy: @escaping () -> ()) -> RowProtocol {
+        CellBuilder.row(
+                elements: [.text, .secondaryCircleButton],
+                tableView: tableView,
+                id: id,
+                height: .heightCell48,
+                bind: { cell in
+                    cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
+
+                    cell.bind(index: 0) { (component: TextComponent) in
+                        component.set(style: .b2)
+                        component.text = title
+                    }
+
+                    cell.bind(index: 1) { (component: SecondaryCircleButtonComponent) in
+                        component.button.set(image: UIImage(named: "copy_20"))
+                        component.onTap = onCopy
+                    }
+                }
+        )
+    }
+
+    private func publicKeyRows() -> [RowProtocol] {
+        [
+            marginRow(id: "top-margin-bitcoin", height: .margin12),
+            headerRow(id: "header-bitcoin", text: "Bitcoin"),
+            copyRow(id: "bitcoin-bip-44", title: MnemonicDerivation.bip44.description, isFirst: true, isLast: false) { [weak self] in self?.viewModel.onCopyBitcoin(derivation: .bip44) },
+            copyRow(id: "bitcoin-bip-49", title: MnemonicDerivation.bip49.description, isFirst: false, isLast: false) { [weak self] in self?.viewModel.onCopyBitcoin(derivation: .bip49) },
+            copyRow(id: "bitcoin-bip-84", title: MnemonicDerivation.bip84.description, isFirst: false, isLast: true) { [weak self] in self?.viewModel.onCopyBitcoin(derivation: .bip84) },
+            marginRow(id: "top-margin-bitcoin-cash", height: .margin24),
+            headerRow(id: "header-bitcoin-cash", text: "Bitcoin Cash"),
+            copyRow(id: "bitcoin-cash-legacy", title: BitcoinCashCoinType.type0.title, isFirst: true, isLast: false) { [weak self] in self?.viewModel.onCopyBitcoinCash(coinType: .type0) },
+            copyRow(id: "bitcoin-cash-new", title: BitcoinCashCoinType.type145.title, isFirst: false, isLast: true) { [weak self] in self?.viewModel.onCopyBitcoinCash(coinType: .type145) },
+            marginRow(id: "top-margin-litecoin", height: .margin24),
+            headerRow(id: "header-litecoin", text: "Litecoin"),
+            copyRow(id: "litecoin-bip-44", title: MnemonicDerivation.bip44.description, isFirst: true, isLast: false) { [weak self] in self?.viewModel.onCopyLitecoin(derivation: .bip44) },
+            copyRow(id: "litecoin-bip-49", title: MnemonicDerivation.bip49.description, isFirst: false, isLast: false) { [weak self] in self?.viewModel.onCopyLitecoin(derivation: .bip49) },
+            copyRow(id: "litecoin-bip-84", title: MnemonicDerivation.bip84.description, isFirst: false, isLast: true) { [weak self] in self?.viewModel.onCopyLitecoin(derivation: .bip84) },
+            marginRow(id: "top-margin-dash", height: .margin24),
+            headerRow(id: "header-dash", text: "Dash"),
+            copyRow(id: "dash-public-keys", title: "Public Keys", isFirst: true, isLast: true) { [weak self] in self?.viewModel.onCopyDash() }
+        ]
+    }
 
     func buildSections() -> [SectionProtocol] {
         var rows = [RowProtocol]()
@@ -213,10 +281,12 @@ extension ShowKeyViewController: SectionsDataSource {
                 rows.append(marginRow(id: "passphrase-margin", height: .margin32))
                 rows.append(passphraseRow)
             }
-        case .privateKeys:
-            for privateKey in viewModel.privateKeys {
+        case .privateKey:
+            if let privateKey = viewModel.evmPrivateKey {
                 rows.append(contentsOf: self.rows(privateKey: privateKey))
             }
+        case .publicKeys:
+            rows.append(contentsOf: publicKeyRows())
         }
 
         return [
@@ -246,12 +316,14 @@ extension ShowKeyViewController {
 
     enum Tab: Int, CaseIterable {
         case mnemonicPhrase
-        case privateKeys
+        case privateKey
+        case publicKeys
 
         var title: String {
             switch self {
             case .mnemonicPhrase: return "show_key.tab.recovery_phrase".localized
-            case .privateKeys: return "show_key.tab.private_keys".localized
+            case .privateKey: return "show_key.tab.private_key".localized
+            case .publicKeys: return "Public Keys" // todo: localize this
             }
         }
     }

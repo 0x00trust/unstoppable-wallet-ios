@@ -105,7 +105,7 @@ class ItemSelectorViewController: ThemeActionSheetController {
         case .complex(let viewItem):
             if let subtitle = viewItem.subtitle {
                 return CellBuilder.selectableRow(
-                        elements: [.multiText, .image],
+                        elements: [.multiText, .image20],
                         tableView: tableView,
                         id: "row_\(rowIndex)",
                         hash: "\(viewItem.selected)",
@@ -121,7 +121,7 @@ class ItemSelectorViewController: ThemeActionSheetController {
                                 component.title.text = viewItem.title
 
                                 component.subtitle.set(style: viewItem.subtitleStyle)
-                                component.subtitle.text = viewItem.subtitle
+                                component.subtitle.text = subtitle
                             })
 
                             cell.bind(index: 1, block: { (component: ImageComponent) in
@@ -136,7 +136,7 @@ class ItemSelectorViewController: ThemeActionSheetController {
             }
 
             return CellBuilder.selectableRow(
-                    elements: [.text, .image],
+                    elements: [.text, .image20],
                     tableView: tableView,
                     id: "row_\(rowIndex)",
                     hash: "\(viewItem.selected)",

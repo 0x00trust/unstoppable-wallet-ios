@@ -11,6 +11,9 @@ class UniswapSettingsService {
 
     var recommendedDeadlineBounds: ClosedRange<TimeInterval> { 600...1800 }
 
+    private let disposeBag = DisposeBag()
+    private let addressService: AddressService
+
     private(set) var errors: [Error] = [] {
         didSet {
             errorsRelay.accept(errors)
@@ -40,33 +43,29 @@ class UniswapSettingsService {
         }
     }
 
-    var recipient: Address? {
-        didSet {
-            sync()
-        }
-    }
-
-    init(tradeOptions: UniswapSettings) {
+    init(tradeOptions: UniswapSettings, addressService: AddressService) {
+        self.addressService = addressService
         slippage = tradeOptions.allowedSlippage
         deadline = tradeOptions.ttl
-        recipient = tradeOptions.recipient
 
         state = .valid(tradeOptions)
+
+        subscribe(disposeBag, addressService.stateObservable) { [weak self] _ in self?.sync() }
         sync()
     }
 
     private func sync() {
         var errors = [Error]()
+        var loading = false
 
         var settings = UniswapSettings()
 
-        if let recipient = recipient, !recipient.raw.isEmpty {
-            do {
-                _ = try EthereumKit.Address(hex: recipient.raw)
-                settings.recipient = recipient
-            } catch {
-                errors.append(SwapSettingsModule.AddressError.invalidAddress)
-            }
+        switch addressService.state {
+        case .loading: loading = true
+        case .success(let address): settings.recipient = address
+        case .validationError: errors.append(SwapSettingsModule.AddressError.invalidAddress)
+        case .fetchError: errors.append(SwapSettingsModule.AddressError.invalidAddress)
+        default: ()
         }
 
         if slippage == .zero {
@@ -87,7 +86,7 @@ class UniswapSettingsService {
 
         self.errors = errors
 
-        state = errors.isEmpty ? .valid(settings) : .invalid
+        state = (!errors.isEmpty || loading) ? .invalid : .valid(settings)
     }
 
 }
@@ -103,37 +102,6 @@ extension UniswapSettingsService {
     }
 
 }
-
-extension UniswapSettingsService: IRecipientAddressService {
-
-    var initialAddress: Address? {
-        guard case let .valid(tradeOptions) = state else {
-            return nil
-        }
-
-        return tradeOptions.recipient
-
-    }
-
-    var recipientError: Error? {
-        errors.first { $0 is SwapSettingsModule.AddressError }
-    }
-
-    var recipientErrorObservable: Observable<Error?> {
-        errorsRelay.map { errors -> Error? in
-            errors.first { $0 is SwapSettingsModule.AddressError }
-        }
-    }
-
-    func set(address: Address?) {
-        recipient = address
-    }
-
-    func set(amount: Decimal) {
-    }
-
-}
-
 
 extension UniswapSettingsService: ISlippageService {
 

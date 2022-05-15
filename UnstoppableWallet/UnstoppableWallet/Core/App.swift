@@ -1,3 +1,5 @@
+import Foundation
+import GRDB
 import ThemeKit
 import StorageKit
 import PinKit
@@ -15,8 +17,8 @@ class App {
 
     let appConfigProvider: AppConfigProvider
 
-    let localStorage: ILocalStorage & IChartTypeStorage
-    let storage: IEnabledWalletStorage & IAccountRecordStorage & IBlockchainSettingsRecordStorage & ILogRecordStorage & IFavoriteCoinRecordStorage & IWalletConnectSessionStorage & IActiveAccountStorage & IRestoreSettingsStorage & IAppVersionRecordStorage & IAccountSettingRecordStorage & IEnabledWalletCacheStorage & ICustomTokenStorage
+    let localStorage: ILocalStorage & IChartIntervalStorage
+    let storage: IEnabledWalletStorage & IAccountRecordStorage & IBlockchainSettingsRecordStorage & ILogRecordStorage & IFavoriteCoinRecordStorage & IWalletConnectSessionStorage& IWalletConnectV2SessionStorage & IActiveAccountStorage & IRestoreSettingsStorage & IAppVersionRecordStorage & IAccountSettingRecordStorage & IEnabledWalletCacheStorage & ICustomTokenStorage & IEvmAccountSyncStateStorage
 
     let themeManager: ThemeManager
     let systemInfoManager: ISystemInfoManager
@@ -46,11 +48,9 @@ class App {
     let feeCoinProvider: FeeCoinProvider
     let feeRateProviderFactory: FeeRateProviderFactory
 
-    let evmNetworkManager: EvmNetworkManager
     let accountSettingManager: AccountSettingManager
-
-    let ethereumKitManager: EvmKitManager
-    let binanceSmartChainKitManager: EvmKitManager
+    let evmSyncSourceManager: EvmSyncSourceManager
+    let evmBlockchainManager: EvmBlockchainManager
 
     let restoreSettingsManager: RestoreSettingsManager
 
@@ -78,6 +78,7 @@ class App {
     let termsManager: ITermsManager
 
     let walletConnectSessionManager: WalletConnectSessionManager
+    let walletConnectV2SessionManager: WalletConnectV2SessionManager
     let walletConnectManager: WalletConnectManager
 
     let activateCoinManager: ActivateCoinManager
@@ -85,13 +86,21 @@ class App {
     let deepLinkManager: IDeepLinkManager
     let launchScreenManager: LaunchScreenManager
 
+    let nftManager: NftManager
+
     let appManager: AppManager
 
     init() {
         appConfigProvider = AppConfigProvider()
 
         localStorage = LocalStorage(storage: StorageKit.LocalStorage.default)
-        storage = GrdbStorage()
+
+        let databaseURL = try! FileManager.default
+                .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+                .appendingPathComponent("bank.sqlite")
+        let dbPool = try! DatabasePool(path: databaseURL.path)
+        storage = GrdbStorage(dbPool: dbPool)
+
         logRecordManager = LogRecordManager(storage: storage)
 
         marketKit = try! MarketKit.Kit.instance(
@@ -129,14 +138,12 @@ class App {
 
         coinManager = CoinManager(marketKit: marketKit, storage: storage)
 
-        evmNetworkManager = EvmNetworkManager(appConfigProvider: appConfigProvider)
-        accountSettingManager = AccountSettingManager(storage: storage, evmNetworkManager: evmNetworkManager)
+        let walletStorage = WalletStorage(coinManager: coinManager, storage: storage)
+        walletManager = WalletManager(accountManager: accountManager, storage: walletStorage)
 
-        let ethereumDataSource = EthKitManagerDataSource(appConfigProvider: appConfigProvider, accountSettingManager: accountSettingManager)
-        let binanceSmartChainDataSource = BscKitManagerDataSource(appConfigProvider: appConfigProvider, accountSettingManager: accountSettingManager)
-
-        ethereumKitManager = EvmKitManager(dataSource: ethereumDataSource)
-        binanceSmartChainKitManager = EvmKitManager(dataSource: binanceSmartChainDataSource)
+        accountSettingManager = AccountSettingManager(storage: storage)
+        evmSyncSourceManager = EvmSyncSourceManager(appConfigProvider: appConfigProvider, accountSettingManager: accountSettingManager)
+        evmBlockchainManager = EvmBlockchainManager(syncSourceManager: evmSyncSourceManager, accountManager: accountManager, walletManager: walletManager, coinManager: coinManager, networkManager: networkManager, storage: storage)
 
         let binanceKitManager = BinanceKitManager(appConfigProvider: appConfigProvider)
 
@@ -145,14 +152,10 @@ class App {
         let settingsStorage: IBlockchainSettingsStorage = BlockchainSettingsStorage(storage: storage)
         initialSyncSettingsManager = InitialSyncSettingsManager(marketKit: marketKit, storage: settingsStorage)
 
-        let walletStorage = WalletStorage(coinManager: coinManager, storage: storage)
-
-        walletManager = WalletManager(accountManager: accountManager, storage: walletStorage)
-
         let adapterFactory = AdapterFactory(
                 appConfigProvider: appConfigProvider,
-                ethereumKitManager: ethereumKitManager,
-                binanceSmartChainKitManager: binanceSmartChainKitManager,
+                evmBlockchainManager: evmBlockchainManager,
+                evmSyncSourceManager: evmSyncSourceManager,
                 binanceKitManager: binanceKitManager,
                 initialSyncSettingsManager: initialSyncSettingsManager,
                 restoreSettingsManager: restoreSettingsManager,
@@ -161,8 +164,7 @@ class App {
         adapterManager = AdapterManager(
                 adapterFactory: adapterFactory,
                 walletManager: walletManager,
-                ethereumKitManager: ethereumKitManager,
-                binanceSmartChainKitManager: binanceSmartChainKitManager,
+                evmBlockchainManager: evmBlockchainManager,
                 initialSyncSettingsManager: initialSyncSettingsManager
         )
         transactionAdapterManager = TransactionAdapterManager(
@@ -182,7 +184,7 @@ class App {
         transactionDataSortModeSettingManager = TransactionDataSortModeSettingManager(storage: localStorage)
 
         pinKit = PinKit.Kit(secureStorage: keychainKit.secureStorage, localStorage: StorageKit.LocalStorage.default)
-        let blurManager: IBlurManager = BlurManager(pinKit: pinKit)
+        let blurManager = BlurManager(pinKit: pinKit)
 
         testModeIndicator = TestModeIndicator(appConfigProvider: appConfigProvider)
 
@@ -202,12 +204,30 @@ class App {
         termsManager = TermsManager(storage: StorageKit.LocalStorage.default)
 
         walletConnectSessionManager = WalletConnectSessionManager(storage: storage, accountManager: accountManager, accountSettingManager: accountSettingManager)
-        walletConnectManager = WalletConnectManager(accountManager: accountManager, ethereumKitManager: ethereumKitManager, binanceSmartChainKitManager: binanceSmartChainKitManager)
+        walletConnectManager = WalletConnectManager(accountManager: accountManager, evmBlockchainManager: evmBlockchainManager)
+
+        let walletClientInfo = WalletConnectClientInfo(
+                projectId: appConfigProvider.walletConnectV2ProjectKey ?? "c4f79cc821944d9680842e34466bfb",
+                relayHost: "relay.walletconnect.com",
+                clientName: "io.horizontalsystems.bank.dev",
+                name: "Unstoppable Wallet",
+                description: nil,
+                url: appConfigProvider.companyWebPageLink,
+                icons: []
+        )
+
+        let walletConnectV2Service = WalletConnectV2Service(info: walletClientInfo)
+        walletConnectV2SessionManager = WalletConnectV2SessionManager(service: walletConnectV2Service, storage: storage, accountManager: accountManager, currentDateProvider: CurrentDateProvider())
 
         activateCoinManager = ActivateCoinManager(marketKit: marketKit, walletManager: walletManager, accountManager: accountManager)
 
         deepLinkManager = DeepLinkManager()
         launchScreenManager = LaunchScreenManager(storage: StorageKit.LocalStorage.default)
+
+        let nftDatabaseStorage = try! NftDatabaseStorage(dbPool: dbPool)
+        let nftStorage = NftStorage(marketKit: marketKit, storage: nftDatabaseStorage)
+        let nftProvider = HsNftProvider(networkManager: networkManager, marketKit: marketKit, appConfigProvider: appConfigProvider)
+        nftManager = NftManager(accountManager: accountManager, evmBlockchainManager: evmBlockchainManager, storage: nftStorage, provider: nftProvider)
 
         let restoreCustomTokenWorker = RestoreCustomTokenWorker(
                 coinManager: coinManager,

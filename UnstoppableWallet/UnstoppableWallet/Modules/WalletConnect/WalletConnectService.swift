@@ -82,11 +82,11 @@ class WalletConnectService {
             throw SessionError.noSuitableAccount
         }
 
-        guard let evmKit = manager.evmKit(chainId: chainId, account: account) else {
+        guard let evmKitWrapper = manager.evmKitWrapper(chainId: chainId, account: account) else {
             throw SessionError.unsupportedChainId
         }
 
-        sessionData = SessionData(peerId: peerId, peerMeta: peerMeta, account: account, evmKit: evmKit)
+        sessionData = SessionData(peerId: peerId, chainId: chainId, peerMeta: peerMeta, account: account, evmKitWrapper: evmKitWrapper)
     }
 
     private func handleRequest(id: Int, requestResolver: () throws -> WalletConnectRequest) {
@@ -136,8 +136,8 @@ extension WalletConnectService {
         sessionData?.peerMeta
     }
 
-    var evmKit: EthereumKit.Kit? {
-        sessionData?.evmKit
+    var evmKitWrapper: EvmKitWrapper? {
+        sessionData?.evmKitWrapper
     }
 
     func pendingRequest(requestId: Int) -> WalletConnectRequest? {
@@ -170,10 +170,10 @@ extension WalletConnectService {
             return
         }
 
-        interactor.approveSession(address: sessionData.evmKit.address.eip55, chainId: sessionData.evmKit.networkType.chainId)
+        interactor.approveSession(address: sessionData.evmKitWrapper.evmKit.address.eip55, chainId: sessionData.chainId)
 
         let session = WalletConnectSession(
-                chainId: sessionData.evmKit.networkType.chainId,
+                chainId: sessionData.chainId,
                 accountId: sessionData.account.id,
                 session: interactor.session,
                 peerId: sessionData.peerId,
@@ -274,21 +274,25 @@ extension WalletConnectService: IWalletConnectInteractorDelegate {
     }
 
     func didRequestSendEthereumTransaction(id: Int, transaction: WCEthereumTransaction) {
+        let chainId = sessionData?.chainId
+        let peerName = sessionData?.peerMeta.name
         queue.async {
             self.handleRequest(id: id) {
-                try WalletConnectSendEthereumTransactionRequest(id: id, transaction: transaction)
+                try WalletConnectSendEthereumTransactionRequest(id: id, chainId: chainId, dAppName: peerName, transaction: transaction)
             }
         }
     }
 
     func didRequestSignEthereumTransaction(id: Int, transaction: WCEthereumTransaction) {
-        print("didRequestSignEthereumTransaction")
+//        print("didRequestSignEthereumTransaction")
     }
 
     func didRequestSign(id: Int, payload: WCEthereumSignPayload) {
+        let chainId = sessionData?.chainId
+        let peerName = sessionData?.peerMeta.name
         queue.async {
             self.handleRequest(id: id) {
-                WalletConnectSignMessageRequest(id: id, payload: payload)
+                WalletConnectSignMessageRequest(id: id, chainId: chainId, dAppName: peerName, payload: payload)
             }
         }
     }
@@ -324,9 +328,10 @@ extension WalletConnectService {
 
     struct SessionData {
         let peerId: String
+        let chainId: Int
         let peerMeta: WCPeerMeta
         let account: Account
-        let evmKit: EthereumKit.Kit
+        let evmKitWrapper: EvmKitWrapper
     }
 
 }

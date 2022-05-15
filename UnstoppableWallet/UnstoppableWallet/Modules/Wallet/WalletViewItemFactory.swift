@@ -1,6 +1,7 @@
 import Foundation
 import CurrencyKit
 import MarketKit
+import EthereumKit
 
 class WalletViewItemFactory {
     private let minimumProgress = 10
@@ -54,17 +55,17 @@ class WalletViewItemFactory {
         )
     }
 
-    private func buttonsViewItem(item: WalletService.Item, expanded: Bool) -> BalanceButtonsViewItem? {
+    private func buttonsViewItem(item: WalletService.Item, actionsHidden: Bool, expanded: Bool) -> BalanceButtonsViewItem? {
         guard expanded else {
             return nil
         }
 
-        let sendButtonsState: ButtonState = item.state == .synced ? .enabled : .disabled
+        let sendButtonsState: ButtonState = actionsHidden ? .hidden : (item.state == .synced ? .enabled : .disabled)
 
         return BalanceButtonsViewItem(
                 sendButtonState: sendButtonsState,
                 receiveButtonState: .enabled,
-                swapButtonState: item.wallet.coinType.swappable ? sendButtonsState : .hidden,
+                swapButtonState: actionsHidden ? .hidden : (item.wallet.coinType.swappable ? sendButtonsState : .hidden),
                 chartButtonState: item.priceItem != nil ? .enabled : .disabled
         )
     }
@@ -150,22 +151,24 @@ class WalletViewItemFactory {
 
 extension WalletViewItemFactory {
 
-    func viewItem(item: WalletService.Item, balanceHidden: Bool, expanded: Bool) -> BalanceViewItem {
+    func viewItem(item: WalletService.Item, balanceHidden: Bool, actionsHidden: Bool, expanded: Bool) -> BalanceViewItem {
         BalanceViewItem(
                 wallet: item.wallet,
                 topViewItem: topViewItem(item: item, balanceHidden: balanceHidden, expanded: expanded),
                 lockedAmountViewItem: lockedAmountViewItem(item: item, balanceHidden: balanceHidden, expanded: expanded),
-                buttonsViewItem: buttonsViewItem(item: item, expanded: expanded)
+                buttonsViewItem: buttonsViewItem(item: item, actionsHidden: actionsHidden, expanded: expanded)
         )
     }
 
-    func headerViewItem(totalItem: WalletService.TotalItem, balanceHidden: Bool) -> WalletViewModel.HeaderViewItem {
+    func headerViewItem(totalItem: WalletService.TotalItem, balanceHidden: Bool, watchAccount: Bool, watchAccountAddress: EthereumKit.Address?) -> WalletViewModel.HeaderViewItem {
         let currencyValue = CurrencyValue(currency: totalItem.currency, value: totalItem.amount)
         let amount = balanceHidden ? "*****" : ValueFormatter.instance.format(currencyValue: currencyValue)
 
         return WalletViewModel.HeaderViewItem(
                 amount: amount,
-                amountExpired: balanceHidden ? false : totalItem.expired
+                amountExpired: balanceHidden ? false : totalItem.expired,
+                manageWalletsHidden: watchAccount,
+                address: watchAccount ? watchAccountAddress?.eip55 : nil
         )
     }
 

@@ -2,11 +2,11 @@ import EthereumKit
 
 class WalletConnectSendEthereumTransactionRequestService {
     private let request: WalletConnectSendEthereumTransactionRequest
-    private let baseService: WalletConnectService
+    private let signService: IWalletConnectSignService
 
-    init(request: WalletConnectSendEthereumTransactionRequest, baseService: WalletConnectService) {
+    init(request: WalletConnectSendEthereumTransactionRequest, baseService: IWalletConnectSignService) {
         self.request = request
-        self.baseService = baseService
+        signService = baseService
     }
 
 }
@@ -21,16 +21,21 @@ extension WalletConnectSendEthereumTransactionRequestService {
         )
     }
 
-    var gasPrice: Int? {
-        request.transaction.gasPrice
+    var gasPrice: GasPrice? {
+        if let maxFeePerGas = request.transaction.maxFeePerGas,
+           let maxPriorityFeePerGas = request.transaction.maxPriorityFeePerGas {
+            return GasPrice.eip1559(maxFeePerGas: maxFeePerGas, maxPriorityFeePerGas: maxPriorityFeePerGas)
+        }
+
+        return request.transaction.gasPrice.flatMap { GasPrice.legacy(gasPrice: $0) }
     }
 
     func approve(transactionHash: Data) {
-        baseService.approveRequest(id: request.id, result: transactionHash)
+        signService.approveRequest(id: request.id, result: transactionHash)
     }
 
     func reject() {
-        baseService.rejectRequest(id: request.id)
+        signService.rejectRequest(id: request.id)
     }
 
 }

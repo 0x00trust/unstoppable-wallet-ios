@@ -49,6 +49,8 @@
 	<string>${infura_project_id}</string>
 	<key>InfuraProjectSecret</key>
 	<string>${infura_project_secret}</string>
+	<key>WallectConnectV2ProjectKey</key>
+	<string>${wallet_connect_v2_project_key}</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tg</string>
@@ -65,8 +67,12 @@
 	<string>We use Face ID to unlock wallet.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>We need access to local network to discover blockchain nodes</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We need access to photo library to save NFT images</string>
 	<key>OfficeMode</key>
 	<string>${OfficeMode}</string>
+	<key>PolygonscanApiKey</key>
+	<string>${polygonscan_api_key}</string>
 	<key>ShowBuildNumber</key>
 	<string>${ShowBuildNumber}</string>
 	<key>TestMode</key>

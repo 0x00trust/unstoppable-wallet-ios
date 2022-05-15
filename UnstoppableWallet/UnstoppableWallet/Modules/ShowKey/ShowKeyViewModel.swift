@@ -8,6 +8,7 @@ class ShowKeyViewModel {
 
     private let openUnlockRelay = PublishRelay<()>()
     private let showKeyRelay = PublishRelay<()>()
+    private let copyRelay = PublishRelay<String>()
 
     init(service: ShowKeyService) {
         self.service = service
@@ -25,6 +26,10 @@ extension ShowKeyViewModel {
         showKeyRelay.asSignal()
     }
 
+    var copySignal: Signal<String> {
+        copyRelay.asSignal()
+    }
+
     var words: [String] {
         service.words
     }
@@ -33,18 +38,8 @@ extension ShowKeyViewModel {
         service.salt.isEmpty ? nil : service.salt
     }
 
-    var privateKeys: [PrivateKey] {
-        var keys = [PrivateKey]()
-
-        if let value = service.ethereumPrivateKey {
-            keys.append(PrivateKey(blockchain: "Ethereum", value: value))
-        }
-
-        if let value = service.binanceSmartChainPrivateKey {
-            keys.append(PrivateKey(blockchain: "Binance Smart Chain", value: value))
-        }
-
-        return keys
+    var evmPrivateKey: String? {
+        service.ethereumPrivateKey
     }
 
     func onTapShow() {
@@ -59,13 +54,28 @@ extension ShowKeyViewModel {
         showKeyRelay.accept(())
     }
 
-}
+    func onCopyBitcoin(derivation: MnemonicDerivation) {
+        if let json = try? service.bitcoinPublicKeys(derivation: derivation) {
+            copyRelay.accept(json)
+        }
+    }
 
-extension ShowKeyViewModel {
+    func onCopyBitcoinCash(coinType: BitcoinCashCoinType) {
+        if let json = try? service.bitcoinCashPublicKeys(coinType: coinType) {
+            copyRelay.accept(json)
+        }
+    }
 
-    struct PrivateKey {
-        let blockchain: String
-        let value: String
+    func onCopyLitecoin(derivation: MnemonicDerivation) {
+        if let json = try? service.litecoinPublicKeys(derivation: derivation) {
+            copyRelay.accept(json)
+        }
+    }
+
+    func onCopyDash() {
+        if let json = try? service.dashPublicKeys() {
+            copyRelay.accept(json)
+        }
     }
 
 }

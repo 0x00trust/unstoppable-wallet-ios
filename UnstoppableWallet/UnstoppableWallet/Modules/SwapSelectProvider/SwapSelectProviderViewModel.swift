@@ -48,6 +48,10 @@ extension SwapSelectProviderViewModel {
         sectionViewItemsRelay.asDriver()
     }
 
+    var blockchainTitle: String? {
+        service.blockchain?.name
+    }
+
     func onSelect(index: Int) {
         service.set(provider: service.items[index].provider)
         selectedRelay.accept(())
@@ -61,18 +65,6 @@ extension SwapSelectProviderViewModel {
         let title: String
         let icon: String
         let selected: Bool
-    }
-
-}
-
-extension SwapModule.Dex.Provider {
-
-    var icon: String {
-        switch self {
-        case .oneInch: return "1inch_24"
-        case .uniswap: return "uniswap_24"
-        case .pancake: return "pancake_24"
-        }
     }
 
 }

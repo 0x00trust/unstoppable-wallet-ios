@@ -131,6 +131,7 @@ class MainSettingsViewController: ThemeViewController {
             }
         }
 
+        subscribe(disposeBag, viewModel.openWalletConnectSignal) { [weak self] in self?.openWalletConnect(mode: $0) }
         subscribe(disposeBag, viewModel.openLinkSignal) { [weak self] url in
             self?.urlManager.open(url: url, from: self)
         }
@@ -143,7 +144,7 @@ class MainSettingsViewController: ThemeViewController {
     }
 
     private func buildTitleImage(cell: BaseThemeCell, image: UIImage?, title: String) {
-        CellBuilder.build(cell: cell, elements: [.image, .text, .image, .margin8, .image])
+        CellBuilder.build(cell: cell, elements: [.image20, .text, .image20, .margin8, .image20])
         cell.bind(index: 0) { (component: ImageComponent) in
             component.imageView.image = image
         }
@@ -157,7 +158,7 @@ class MainSettingsViewController: ThemeViewController {
     }
 
     private func buildTitleValue(cell: BaseThemeCell, image: UIImage?, title: String) {
-        CellBuilder.build(cell: cell, elements: [.image, .text, .text, .margin8, .image])
+        CellBuilder.build(cell: cell, elements: [.image20, .text, .text, .margin8, .image20])
         cell.bind(index: 0) { (component: ImageComponent) in
             component.imageView.image = image
         }
@@ -202,7 +203,7 @@ class MainSettingsViewController: ThemeViewController {
                     height: .heightCell48,
                     autoDeselect: true,
                     action: { [weak self] in
-                        self?.openWalletConnect()
+                        self?.viewModel.onTapWalletConnect()
                     }
             )
         ]
@@ -310,8 +311,15 @@ class MainSettingsViewController: ThemeViewController {
         ]
     }
 
-    private func openWalletConnect() {
-        navigationController?.pushViewController(WalletConnectListModule.viewController(), animated: true)
+    private func openWalletConnect(mode: MainSettingsViewModel.WalletConnectOpenMode) {
+        switch mode {
+        case .noAccount:
+            present(WalletConnectNoAccountViewController().toBottomSheet, animated: true)
+        case .watchAccount:
+            present(WalletConnectWatchAccountViewController(sourceViewController: self).toBottomSheet, animated: true)
+        case .list:
+            navigationController?.pushViewController(WalletConnectListModule.viewController(), animated: true)
+        }
     }
 
 }

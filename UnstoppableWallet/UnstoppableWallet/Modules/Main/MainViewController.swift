@@ -40,6 +40,7 @@ class MainViewController: ThemeTabBarController {
 
         subscribe(disposeBag, viewModel.releaseNotesUrlDriver) { [weak self] url in self?.showReleaseNotes(url: url) }
         subscribe(disposeBag, viewModel.deepLinkDriver) { [weak self] deepLink in self?.handle(deepLink: deepLink) }
+        subscribe(disposeBag, viewModel.showSessionRequestSignal) { [weak self] request in self?.handle(request: request) }
 
         if viewModel.needToShowJailbreakAlert {
             showJailbreakAlert()
@@ -105,11 +106,15 @@ class MainViewController: ThemeTabBarController {
         }
 
         showAlerts.append({
-            let module = MarkdownModule.gitReleaseNotesMarkdownViewController(url: url, closeHandler: { [weak self] in
+            let module = MarkdownModule.gitReleaseNotesMarkdownViewController(url: url, presented: true, closeHandler: { [weak self] in
                 self?.showNextAlert()
             })
             DispatchQueue.main.async {
-                self.present(ThemeNavigationController(rootViewController: module), animated: true)
+                let controller = ThemeNavigationController(rootViewController: module)
+                if let delegate = module as? UIAdaptivePresentationControllerDelegate {
+                    controller.presentationController?.delegate = delegate
+                }
+                return self.present(controller, animated: true)
             }
         })
     }
@@ -140,15 +145,29 @@ class MainViewController: ThemeTabBarController {
             return
         }
 
-        var controller: UIViewController? = self
-        while let presentedController = controller?.presentedViewController {
-            controller = presentedController
-        }
-
         switch deepLink {
         case let .walletConnect(url):
-            WalletConnectModule.start(uri: url, sourceViewController: controller)
+            let result = WalletConnectUriHandler.connect(uri: url)
+            switch result {
+            case .success(let service):
+                guard let viewController = WalletConnectMainModule.viewController(
+                        service: service,
+                        sourceViewController: visibleController) else {
+                    return
+                }
+
+                visibleController.present(viewController, animated: true)
+            default: return
+            }
         }
+    }
+
+    private func handle(request: WalletConnectRequest) {
+        guard let viewController = WalletConnectRequestModule.viewController(signService: App.shared.walletConnectV2SessionManager.service, request: request) else {
+            return
+        }
+
+        visibleController.present(ThemeNavigationController(rootViewController: viewController), animated: true)
     }
 
 }

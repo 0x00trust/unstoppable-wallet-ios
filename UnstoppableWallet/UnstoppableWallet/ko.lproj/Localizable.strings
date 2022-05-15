@@ -3,6 +3,7 @@
 "button.cancel" = "취소";
 "button.close" = "가까운, 닫힌";
 "button.done" = "완료";
+"button.reset" = "초기화";
 "button.restore" = "복구";
 "button.next" = "다음";
 "button.share" = "공유";
@@ -19,6 +20,7 @@
 "button.sign" = "가입";
 "button.more" = "더 보기";
 
+"alert" = "알림";
 "alert.copied" = "복사됨";
 "alert.no_internet" = "인터넷에 연결되지 않음";
 "alert.wrong_amount" = "잘못된 금액";
@@ -86,8 +88,9 @@
 "show_key.description" = "다음에 표시될 복구 문구는 휴대폰을 분실, 도난, 파손된 경우 자금을 복구할 수 있는 유일한 방법입니다.\n\n아무도 화면을 보고 있지 않은지 확인합니다.";
 "show_key.button_show" = "표시";
 "show_key.tab.recovery_phrase" = "복구 문구";
-"show_key.tab.private_keys" = "개인 암호";
+"show_key.tab.private_key" = "개인 암호";
 "show_key.passphrase" = "암호 문구";
+"show_key.private_key.description" = "이 키는 모든 EVM 호환 블록체인용입니다.";
 
 "private_key_copying.title" = "경고";
 "private_key_copying.subtitle" = "개인 키 복사의 위험";
@@ -138,6 +141,7 @@
 "balance.add_coin" = "코인 추가";
 "balance.empty.add_coins" = "코인 추가";
 "balance.empty.description" = "이 지갑에 코인을 넣지 않았습니다.";
+"balance.watch_empty.description" = "이 지갑 주소에는 잔액이 없습니다";
 "balance.sort_by" = "정렬 기준";
 "balance.sort.header" = "정렬 기준";
 "balance.sort.valueHighToLow" = "잔액";
@@ -179,7 +183,6 @@
 "send.tx_speed_recommended" = "권장";
 "send.tx_speed_high" = "높음";
 "send.tx_speed_custom" = "사용자 지정";
-"send.tx_duration" = "기간";
 "send.duration.hours" = "%d 시";
 "send.duration.minutes" = "%d 분";
 "send.available_balance" = "사용 가능한 잔액";
@@ -205,7 +208,6 @@
 
 "send.confirmation.you_send" = "보냅니다";
 "send.confirmation.to" = "에게";
-"send.confirmation.method" = "메소드";
 "send.confirmation.domain" = "도메인";
 "send.confirmation.address" = "주소";
 "send.confirmation.account" = "계정";
@@ -216,10 +218,12 @@
 "send.confirmation.resend_button" = "재전송";
 "send.confirmation.cancel_description" = "이 작업은 자신에게 새로운 0 금액 트랜잭션으로 다시 전송하여 이전 트랜잭션을 무효화하려고 시도합니다. 새 트랜잭션이 전송되었을 때 원래 트랜잭션이 보류 상태로 남아 있으면 해당 트랜잭션이 무효화되고 교체될 가능성이 높습니다(보장되지 않음). 이 두 트랜잭션 중 하나만 블록체인에 포함됩니다.";
 "send.confirmation.cancel_button" = "트랜잭션 취소";
+"send.confirmation.nonce" = "Nonce";
 "send.amount_error.balance" = "잔고 부족";
 "send.amount_error.maximum_amount" = "최대 %@ 금액";
 "send.amount_error.minimum_amount" = "최소 %@ 금액";
 "send.amount_error.min_required_balance" = "최소 %@ 만큼의 필요 잔여금";
+"send.amount_warning.coin_needed_for_fee" = "향후 거래에 대해 지불할 수 있도록 일부 %@를 잔액으로 남겨두는 것이 좋습니다.";
 "send.token.insufficient_fee_alert" = "%@ (%@) 에 대한 거래 수수료는 %@로 지불되었습니다. 귀하는 %@가 필요합니다.";
 "send.stuck_warning" = "경고! 갇힐 위험";
 
@@ -238,7 +242,6 @@
 "swap.you_pay" = "지불하기";
 "swap.estimated" = "예상";
 "swap.balance" = "잔액";
-"swap.powered_by" = "제공";
 "swap.allowance" = "허용량";
 "swap.you_get" = "얻기";
 "swap.token" = "선택";
@@ -250,8 +253,7 @@
 "swap.approving_button" = "승인 중...";
 "swap.trade_error.not_found" = "이 토큰을 스왑할 수 없습니다";
 "swap.button_error.insufficient_balance" = "잔액이 부족합니다";
-"swap.switch_provider.title" = "공급자 스왑";
-"swap.switch_provider.subtitle" = "스위처";
+"swap.switch_provider.title" = "스왑 서비스";
 
 "swap.price" = "금액";
 "swap.buy_price" = "구매 가격";
@@ -278,8 +280,10 @@
 "swap.advanced_settings.error.invalid_slippage" = "올바르지 않은 슬립";
 "swap.advanced_settings.error.invalid_deadline" = "올바르지 않은 마감 시간";
 
-"swap.one_inch.error.cannot_estimate" = "오류! 잔액을 확인하고 수수료를 충당하기에 충분한 %@이 있는지 확인하십시오. 또는 가격 슬리피지 양을 늘리고 다시 시도하십시오. 3초 후에 다시 시도합니다...";
-
+"swap.one_inch.error.cannot_estimate" = "추정 오류";
+"swap.one_inch.error.cannot_estimate.info" = "잔액을 확인하여 수수료를 충당하기에 충분한 %@이 있는지 확인하십시오. 또는 가격 슬리피지 금액을 늘리고 다시 시도하십시오. 3초 후에 자동 재시도합니다...";
+"swap.one_inch.error.insufficient_liquidity" = "유동성 부족";
+"swap.one_inch.error.insufficient_liquidity.info" = "이 거래를 처리할 수 있는 유동성이 충분하지 않을 수 있습니다. 금액을 낮추십시오.";
 
 "swap.service" = "서비스";
 "swap.service.title" = "서비스";
@@ -291,9 +295,6 @@
 // Swap Confirmation
 
 "swap.confirmation.swap_button" = "스왑";
-"swap.confirmation.guaranteed" = "보증됨";
-"swap.confirmation.maximum" = "최대";
-"swap.confirmation.estimated" = "예상";
 "swap.confirmation.impact_too_high" = "시장 가격과 예상 결제 가격의 차이가 너무 큽니다.";
 
 "swap.dex_info.description" = "이 거래소 서비스는 %@ 블록체인에 구축된 분산형 토큰 교환 프로토콜인 %@에 의해 구동됩니다.\n\n%@는 스마트 계약에 의해 완전 자동화되고 관리되므로 부정 행위 없이 토큰 교환을 안정적으로 수행할 수 있습니다.";
@@ -325,7 +326,7 @@
 "market.category.overview" = "Overview";
 "market.category.posts" = "News";
 "market.category.watchlist" = "Watchlist";
-"market.total_market_cap" = "Total Market Cap";
+"market.total_market_cap" = "Total Cap";
 "market.24h_volume" = "24h Volume";
 "market.defi_cap" = "DeFi Cap";
 "market.defi_tvl" = "TVL in DeFi";
@@ -366,55 +367,6 @@
 "market_discovery.browse_categories" = "Browse Categories";
 "market_discovery.top_coins" = "TOP Coins";
 
-"market_discovery.filter_title.blockchain" = "Blockchains";
-"market_discovery.filter_title.dexes" = "DEXes";
-"market_discovery.filter_title.lending" = "Lending";
-"market_discovery.filter_title.privacy" = "Privacy";
-"market_discovery.filter_title.scaling" = "Scaling";
-"market_discovery.filter_title.oracles" = "Oracles";
-"market_discovery.filter_title.prediction_markets" = "Predictions";
-"market_discovery.filter_title.yield_aggregators" = "Yield Aggregators";
-"market_discovery.filter_title.stablecoins" = "Stablecoins";
-"market_discovery.filter_title.tokenized_bitcoin" = "Tokenized Bitcoin";
-"market_discovery.filter_title.exchange_tokens" = "Exchange Tokens";
-"market_discovery.filter_title.risk_management" = "Risk Mangement";
-"market_discovery.filter_title.wallets" = "Wallets";
-"market_discovery.filter_title.synthetics" = "Synthetics";
-"market_discovery.filter_title.index_funds" = "Index Funds";
-"market_discovery.filter_title.nft" = "NFT";
-"market_discovery.filter_title.fundraising" = "Fundraising";
-"market_discovery.filter_title.gaming" = "Gaming";
-"market_discovery.filter_title.infrastructure" = "Infrastructure";
-"market_discovery.filter_title.analytics" = "Analytics";
-"market_discovery.filter_title.storage" = "Storage";
-"market_discovery.filter_title.identity" = "Identity";
-"market_discovery.filter_title.yield_tokens" = "Yield Tokens";
-
-
-"market_discovery.filter_description.blockchain" = "Native cryptocurrencies on major blockchains.";
-"market_discovery.filter_description.dexes" = "Decentralized cryptocurrency exchanges.";
-"market_discovery.filter_description.lending" = "Protocols for lending and borrowing.";
-"market_discovery.filter_description.privacy" = "Anonymous cryptocurrencies and privacy solutions.";
-"market_discovery.filter_description.scaling" = "Solutions for faster blockchain transactions.";
-"market_discovery.filter_description.oracles" = "Connecting real-world data to smart contracts.";
-"market_discovery.filter_description.prediction_markets" = "Markets to bet on events in the future.";
-"market_discovery.filter_description.yield_aggregators" = "Solutions for earning from idle crypto assets.";
-"market_discovery.filter_description.stablecoins" = "Crypto tokens pegged 1-1 to fiat currency.";
-"market_discovery.filter_description.tokenized_bitcoin" = "Crypto tokens pegged 1-1 to Bitcoin price.";
-"market_discovery.filter_description.exchange_tokens" = "Tokens issued by centralized exchanges.";
-"market_discovery.filter_description.risk_management" = "Risk assessment, insurance and hedging.";
-"market_discovery.filter_description.wallets" = "Tokens issued by cryptocurrency wallets.";
-"market_discovery.filter_description.synthetics" = "Platforms for creating decentralized synthetic assets.";
-"market_discovery.filter_description.index_funds" = "Assets that pegged in price to a set of tokens.";
-"market_discovery.filter_description.nft" = "NFT projects.";
-"market_discovery.filter_description.fundraising" = "Fundraising and token sale platforms.";
-"market_discovery.filter_description.gaming" = "Crypto projects in gaming and VR sector.";
-"market_discovery.filter_description.infrastructure" = "Projects building infrastructure solutions.";
-"market_discovery.filter_description.analytics" = "Token-powered analytics and investment instruments.";
-"market_discovery.filter_description.storage" = "Decentralized data-storage.";
-"market_discovery.filter_description.identity" = "Decentralized identity.";
-"market_discovery.filter_description.yield_tokens" = "Interesting Bearing Tokens.";
-
 "market_watchlist.empty.caption" = "Your watchlist is empty.";
 
 "market.search.title" = "Search";
@@ -427,11 +379,13 @@
 "market.advanced_search.24h" = "24h";
 
 "market.advanced_search.market_parameters" = "Market Parameters";
+"market.advanced_search.network_parameters" = "Network Parameters";
 "market.advanced_search.price_parameters" = "Price Parameters";
 "market.advanced_search.choose_set" = "Choose Set";
 "market.advanced_search.market_cap" = "Market Cap";
 "market.advanced_search.volume" = "Trading Volume";
 "market.advanced_search.liquidity" = "DEX Liquidity";
+"market.advanced_search.blockchains" = "Blockchains";
 "market.advanced_search.price_period" = "Price Period";
 "market.advanced_search.price_change" = "Price Change";
 
@@ -478,7 +432,7 @@
 
 "market.advanced_search_results.title" = "Results";
 
-"market.global.total_market_cap.title" = "Total Market Cap";
+"market.global.total_market_cap.title" = "Total Cap";
 "market.global.volume_24h.title" = "24h Volume";
 "market.global.defi_cap.title" = "DeFi Cap";
 "market.global.tvl_in_defi.title" = "TVL in DeFi";
@@ -503,25 +457,21 @@
 "coin_page.roi.day200" = "6 Month";
 "coin_page.roi.year1" = "1 Year";
 
-"coin_page.tab.overview" = "Overview";
-"coin_page.tab.markets" = "Market";
-"coin_page.tab.details" = "Details";
+"coin_page.tab.overview" = "Price";
+"coin_page.tab.markets" = "Markets";
+"coin_page.tab.details" = "Analytics";
 "coin_page.tab.tweets" = "Tweets";
 
 "coin_page.market_cap" = "Market Cap";
 "coin_page.circulating_supply" = "In Circulation";
 "coin_page.total_supply" = "Total Supply";
-"coin_page.dilluted_market_cap" = "Diluted MCap";
+"coin_page.diluted_market_cap" = "Diluted MCap";
 "coin_page.genesis_date" = "Inception Date";
 
 "coin_page.trading_volume" = "Trading Volume";
 "coin_page.trading_volume.description" = "The historical change in daily aggregate trading volume for %@";
 "coin_page.markets" = "Markets";
-
-"coin_page.coin_markets" = "%@ Markets";
-"coin_page.coin_markets.sort_by" = "Sort By";
-"coin_page.coin_markets.sort_by.highest_volume" = "Highest Volume";
-"coin_page.coin_markets.sort_by.lowest_volume" = "Lowest Volume";
+"coin_page.markets.empty" = "No data available";
 
 "coin_page.token_liquidity" = "Token Liquidity";
 "coin_page.token_distribution" = "Token Distribution";
@@ -635,10 +585,13 @@
 "transactions.yesterday" = "어제";
 
 "transactions.types.all" = "All";
-"transactions.types.incoming" = "Incoming";
-"transactions.types.outgoing" = "Outgoing";
-"transactions.types.swap" = "Swap";
-"transactions.types.approve" = "Approve";
+"transactions.types.incoming" = "수령됨";
+"transactions.types.outgoing" = "전송됨";
+"transactions.types.swap" = "스왑";
+"transactions.types.approve" = "승인";
+
+"transactions.unknown_transaction.title" = "트랜잭션을 구문 분석할 수 없습니다.";
+"transactions.unknown_transaction.description" = "트랜잭션을 구문 분석할 수 없습니다.";
 
 // Transaction Info
 
@@ -653,9 +606,9 @@
 "tx_info.to_hash" = "에게";
 "tx_info.button_explorer" = "%@에서 보기";
 "tx_info.rate" = "과거 환율";
-"tx_info.options.speed_up" = "Speed Up";
-"tx_info.options.cancel" = "Cancel";
-"tx_info.transaction.already_in_block" = "Transaction already in block";
+"tx_info.options.speed_up" = "가속";
+"tx_info.options.cancel" = "취소";
+"tx_info.transaction.already_in_block" = "이미 차단된 거래";
 "tx_info.fee" = "수수료";
 "tx_info.fee.estimated" = "수수료 (추정)";
 "tx_info.to_self_note" = "이 거래는 귀하의 주소로 전송이 되었습니다";
@@ -700,6 +653,7 @@
 
 "manage_wallets.title" = "지갑";
 "manage_wallets.not_found" = "검색 결과가 없습니다. 스마트 계약 주소를 알고 있는 경우 토큰을 수동으로 추가해 보십시오.";
+"manage_wallets.search_placeholder" = "토큰 코드 또는 이름";
 
 "manage_coins.add_coin.title" = "%@ 추가 ";
 "manage_coins.add_coin.subtitle" = "%@ 지갑";
@@ -800,11 +754,13 @@ Unstoppable 지갑은 완전한 오픈소스여서 누구나 앱이 요구하는
 "settings_manage_keys.delete.title" = "지갑 삭제하기";
 "settings_manage_keys.delete.confirmation_remove" = "장치에서 이 지갑을 삭제합니다.";
 "settings_manage_keys.delete.confirmation_loose" = "이 지갑의 개인 암호를 백업하지 않으면 귀하께서는 자금 접근을 하지 못합니다.";
+"settings_manage_keys.delete.confirmation_watch" = "이 지갑을 삭제하시겠습니까?";
 
 // Settings -> About App
 
 "settings.about_app.title" = "앱 정보";
 "settings.about_app.app_name" = "Unstoppable Wallet";
+"settings.about_app.whats_new" = "새로운 기능";
 "settings.about_app.website" = "웹사이트";
 "settings.about_app.contact" = "연락처";
 "settings.about_app.rate_us" = "앱 평가";
@@ -854,7 +810,7 @@ Unstoppable 지갑은 완전한 오픈소스여서 누구나 앱이 요구하는
 "chart.time_duration.week2" = "2주";
 "chart.time_duration.month" = "1개월";
 "chart.time_duration.month3" = "3개월";
-"chart.time_duration.halyear" = "6개월";
+"chart.time_duration.halfyear" = "6M";
 "chart.time_duration.year" = "1년";
 "chart.time_duration.year2" = "2년";
 
@@ -901,8 +857,7 @@ Unstoppable 지갑은 완전한 오픈소스여서 누구나 앱이 요구하는
 
 // Restore Select
 
-"restore_select.title" = "코인 선택하기";
-"restore_select.not_found" = "찾을 수 없음";
+"restore_select.title" = "블록체인 선택";
 
 // Lock Info
 
@@ -923,9 +878,7 @@ Unstoppable 지갑은 완전한 오픈소스여서 누구나 앱이 요구하는
 
 // Intro
 
-"intro.next" = "다음";
-"intro.start" = "시작";
-"intro.brand.description" = "암호를 저장 및 거래합니다. 자산을 완전히 통제합니다. 익명인 상태로 유지합니다.";
+"intro.start" = "Be Unstoppable";
 "intro.unchain_assets.title" = "풀린 자산";
 "intro.unchain_assets.description" = "자신을 잠금하지 말고 다른 사람들이 귀하에게 그렇게 하도록 두지 마십시오.";
 "intro.go_borderless.title" = "무경계로";
@@ -949,17 +902,21 @@ Unstoppable 지갑은 완전한 오픈소스여서 누구나 앱이 요구하는
 "add_token.invalid_contract_address_or_bep2_symbol" = "잘못된 계약 주소 또는 BEP2 기호";
 "add_token.token_not_found" = "토큰 찾을 수 없음";
 "add_token.success_add" = "추가됨";
+"add_token.input_placeholder" = "계약 주소";
 
 // Wallet Connect
 
 "wallet_connect.title" = "Wallet Connect";
 "wallet_connect.error.invalid_url" = "잘못된 주소";
 "wallet_connect.url" = "URL 주소";
+"wallet_connect.active_account" = "지갑 활성화";
+"wallet_connect.main.unsupported_chains" = "지원되는 체인이 없습니다!";
 "wallet_connect.connect_description" = "승인을 눌러 이 앱이 귀하의 공공 주소를 볼 수 있도록 허용하십시오. 이것은 잠재적인 피싱 위험으로부터 데이터를 보호하기 위한 중요한 보안 단계 입니다.";
 "wallet_connect.usage_description" = "브라우저로 이동하십시오. 브라우저에서 상호 작용하는 동안에는 이 페이지를 닫지 마십시오.";
 "wallet_connect.no_connection" = "연결을 설정하지 못했습니다. 다시 연결해 보세요.";
 "wallet_connect.button_reconnect" = "재연결";
 "wallet_connect.button_disconnect" = "연결 해제";
+"ethereum_transaction.error.title" = "오류";
 "ethereum_transaction.error.insufficient_balance" = "거래에서 전송하려면 %@가 필요합니다.";
 "ethereum_transaction.error.insufficient_balance_with_fee" = "현재 %@ 잔액은 거래 수수료를 포함하여이 거래를 처리하는 데 필요한 금액보다 적습니다.";
 "ethereum_transaction.error.lower_than_base_gas_limit" = "선택한 수수료 값이 너무 낮아 거부됩니다!";
@@ -968,13 +925,28 @@ Unstoppable 지갑은 완전한 오픈소스여서 누구나 앱이 요구하는
 "wallet_connect.button.confirm" = "확인";
 "wallet_connect.sign.request_title" = "서명 요청";
 "wallet_connect.sign.domain" = "도메인";
+"wallet_connect.sign.dapp_name" = "dApp";
 "wallet_connect.sign.message" = "서명할 메시지";
 "wallet_connect.sign.description" = "인증을 위해 메시지에 서명하십시오";
 
 "wallet_connect_list.title" = "Wallet Connect";
+"wallet_connect.list.empty_view_text" = "활성 세션 없음";
+"wallet_connect.list.empty_view_button_text" = "새로운 연결";
+
+"wallet_connect.list.pending_requests" = "보류 중인 요청";
+"wallet_connect.list.version_text" = "버전 %@";
+"wallet_connect.list.v1_bottom_text" = "WalletConnect의 첫 번째 버전에서는 요청을 보고 확인하기 위해 세션으로 이동해야 합니다.";
 "wallet_connect_list.new_connection" = "새로운 연결";
 "wallet_connect_list.disconnecting" = "연결을 끊는 중...";
 
+"wallet_connect.no_account.description" = "적합한 지갑이 없습니다. 기존 지갑을 생성하거나 복원해야 합니다.";
+"wallet_connect.no_account.i_understand" = "이해합니다";
+
+"wallet_connect.watch_account.description" = "이 기능은 시계 전용 지갑에서는 작동하지 않으므로 복원 또는 생성된 지갑으로 전환해야 합니다.";
+"wallet_connect.watch_account.switch" = "전환";
+
+"wallet_connect.pending_requests_title" = "보류 중인 요청";
+"wallet_connect.pending_requests.nonactive_footer" = "요청을 열려면 원하는 지갑을 활성화해야 합니다";
 
 // App Status
 
@@ -992,28 +964,20 @@ Unstoppable 지갑은 완전한 오픈소스여서 누구나 앱이 요구하는
 
 "status_info.title" = "상태";
 "status_info.pending.title" = "보류 중";
-"status_info.pending.content" = "아직 블록체인에서 거래가 확인되지 않았습니다. 권장 또는 더 높은 수수료 설정으로 전송된 거래는 일반적으로 10분 이내에 처리됩니다. 낮은 수수료로 전송된 거래는 몇 시간 또는 며칠 동안 보류 상태로 남아 있을 수 있으며 완전히 거부될 수도 있습니다.";
+"status_info.pending.content" = "거래는 아직 블록체인에서 확인되지 않았습니다. 권장 또는 더 높은 수수료 설정으로 전송된 거래는 일반적으로 분 이내에 처리됩니다. 낮은 수수료로 전송된 거래는 몇 시간 또는 며칠 동안 보류 상태로 남아 있을 수 있으며 거부될 수도 있습니다. 또한 Unstoppable 지갑 인터페이스에 표시되는 개별 트랜잭션의 상태는 일반적으로 짧은 지연으로 업데이트됩니다.";
 "status_info.processing.title" = "처리 중";
 "status_info.processing.content" = "거래는 이미 블록체인에 포함되었지만 영구적인 완결성에 도달하지 않았습니다. 이 시점에서 소액 결제를 위해 완료된 거래로 간주하는 것이 안전합니다. 더 큰 지불의 경우 거래 상태가 완료로 변경될 때까지 기다리는 것이 좋습니다.";
 "status_info.completed.title" = "완료됨";
 "status_info.confirmed.content" = "거래가 완료되고 영구적이고 되돌릴 수 없는 것으로 간주됩니다.";
 "status_info.failed.title" = "실패";
-"status_info.failed.content" = "거래가 처리되지 않았으며 가치 이전이 발생하지 않았습니다. 실패 상태의 거래는 여전히 블록체인에 기록되고 거래 수수료가 소비됩니다. Unstoppable 앱은 이러한 거래에 대한 실패 이유를 표시할 수 없지만 사용자는 etherscan.io와 같은 공개 블록 탐색기에서 직접 찾을 수 있습니다.";
-
-// Enable Coins
-
-"enable_coins.title" = "코인 활성";
-"enable_coins.description" = "잔액이 있는 모든 %@의 코인 사용.";
-"enable_coins.enable_button" = "활성화";
-"enable_coins.enabling" = "활성화 중...";
-"enable_coins.enabled_coins" = "Enabled %@ more coins";
-"enable_coins.enabled_no_coins" = "잔액이 있는 코인을 찾을 수 없습니다";
+"status_info.failed.content" = "거래가 처리되지 않았으며 가치 이전이 발생하지 않았습니다. 실패 원인에 따라 일부 실패한 거래는 거래 수수료를 소모할 수 있습니다. 다른 거래로 대체되거나 취소된 거래는 거래 수수료를 소비하지 않으며 실패한 것으로 표시됩니다. Unstoppable 앱은 거래 실패의 원인을 표시할 수 없지만 사용자는 etherscan.io와 같은 공개 블록 탐색기에서 직접 찾을 수 있습니다.";
 
 // Onboarding
 
-"onboarding.balance.description" = "귀하께서는 아직 지갑이 없습니다. 새 생성 또는 기존 복원 해주십시오";
+"onboarding.balance.description" = "아직 지갑이 없습니다";
 "onboarding.balance.create" = "만들기";
 "onboarding.balance.restore" = "복구";
+"onboarding.balance.watch" = "주소 관찰";
 "onboarding.balance.password_hint" = "중요! 기존 지갑을 복원하지만 새로운 암호를 사용하면 완전히 새로운 지갑이 생성됩니다. 여러 지갑에 대해 단일 12-24 단어 니모닉 복구 구문을 사용하려는 경우 편리합니다.";
 
 // Manage Accounts
@@ -1042,5 +1006,67 @@ Unstoppable 지갑은 완전한 오픈소스여서 누구나 앱이 요구하는
 
 // EVM Network
 
-"evm_network.switches_automatically" = "switches automatically";
-"evm_network.description" = "MainNet HTTP provider uses a number of sources (listed below) and switches between them automatically.";
+"evm_network.switches_automatically" = "자동으로 전환";
+"evm_network.description" = "메인넷 HTTP 공급자는 여러 소스(아래 나열)를 사용하고 자동으로 전환합니다.";
+
+// Fee Settings
+
+"fee_settings" = "수수료 설정";
+"fee_settings.max_fee" = "최대 수수료";
+"fee_settings.max_fee.info" = "주어진 거래에 대한 최대 예상 총 수수료입니다. 일반적으로 실제 거래 수수료는 더 낮습니다.";
+"fee_settings.gas_limit" = "Gas Limit";
+"fee_settings.gas_limit.info" = "가스 한도는 사용자가 주어진 거래를 보낼 때 기꺼이 지출할 가스 단위의 최대량입니다. 복잡한 거래에는 단순한 거래보다 더 많은 가스 단위가 필요합니다. 가스 한도는 각 거래에 대해 자동으로 추정 및 설정됩니다.";
+"fee_settings.gas_price" = "Gas Used";
+"fee_settings.gas_price.info" = "네트워크 거래 수수료는 가스 단위로 측정됩니다. 가스 가격은 사용자가 가스 단위당 지출할 의향이 있는 금액입니다. 네트워크가 사용 중일 때는 가스 가격이 높고 유휴 상태일 때는 가스 가격이 낮습니다. 가스 가격이 충분하지 않아 거래가 장기간 보류 상태로 남아 있는 경우가 많습니다.";
+"fee_settings.current_base_fee" = "현재 기본 수수료";
+"fee_settings.base_fee" = "최대 기본 수수료";
+"fee_settings.base_fee.info" = "이더리움의 각 트랜잭션은 사용자가 해당 트랜잭션을 처리하기 위해 일정량의 가스 단위를 소비해야 합니다. 단일 가스 장치의 가격은 네트워크 상태에 따라 실시간으로 변경되며 단일 개체에 의해 제어되지 않습니다. 최대 옵션 채굴자 팁(아래 참조)과 결합된 기본 수수료율은 사용자가 거래를 보내기 위해 지불할 용의가 있는 가스 단위의 최고 가격을 나타냅니다.";
+"fee_settings.tips" = "최대 채굴자 팁";
+"fee_settings.tips.info" = "채굴자 수수료(일명 광부 팁)는 네트워크 참가자가 거래의 우선 순위를 정하도록 장려하기 위해 사용자가 포함할 수 있는 선택적 수수료를 나타냅니다.";
+"fee_settings.errors.insufficient_balance" = "잔액이 부족합니다";
+"fee_settings.errors.insufficient_balance.info" = "현재 %@ 잔액은 거래 수수료를 포함하여이 거래를 처리하는 데 필요한 금액보다 적습니다.";
+"fee_settings.errors.low_max_fee" = "적은 수수료";
+"fee_settings.errors.low_max_fee.info" = "설정된 거래 수수료 금액이 현재 이 거래를 처리하기에 충분하지 않습니다.";
+"fee_settings.warning.risk_of_getting_stuck" = "위험";
+"fee_settings.warning.risk_of_getting_stuck.info" = "트랜잭션이 잠시 동안 보류 상태로 유지되거나 완전히 실패할 수 있습니다.";
+"fee_settings.warning.overpricing" = "수수료가 너무 높음";
+"fee_settings.warning.overpricing.info" = "설정된 거래 수수료가 지금 이 거래를 처리하는 데 필요한 것보다 높습니다.";
+
+// Watch Address
+
+"watch_address.title" = "주소";
+"watch_address.watch" = "관찰";
+
+// Nft Collections
+
+"nft_collections.title" = "NFT";
+"nft_collections.last_sale" = "마지막 판매";
+"nft_collections.average_7d" = "평균 7일";
+"nft_collections.average_30d" = "평균 30일";
+"nft_collections.on_sale" = "판매 중";
+
+// Nft Asset
+
+"nft_asset.last_sale" = "마지막 판매";
+"nft_asset.average_7d" = "7일 평균";
+"nft_asset.average_30d" = "30일 평균";
+"nft_asset.floor_price" = "바닥 가격";
+"nft_asset.on_sale" = "할인 중";
+"nft_asset.until_date" = "%@ 까지";
+"nft_asset.buy_now" = "지금 구매";
+"nft_asset.top_bid" = "최고 매수가";
+"nft_asset.minimum_bid" = "최저 매수가";
+"nft_asset.best_offer" = "최고 제안";
+"nft_asset.properties" = "속성";
+"nft_asset.description" = "설명";
+"nft_asset.details" = "상세 정보";
+"nft_asset.details.contract_address" = "계약 주소";
+"nft_asset.details.token_id" = "토큰 ID";
+"nft_asset.details.token_standard" = "토큰 표준";
+"nft_asset.details.blockchain" = "블록 체인";
+"nft_asset.links" = "링크";
+"nft_asset.links.website" = "웹사이트";
+"nft_asset.options.save_to_photos" = "사진 저장하기";
+"nft_asset.options.set_as_watch_face" = "시계 모드로 설정";
+"nft_asset.save_to_photos.success" = "NFT 이미지가 사진 라이브러리에 저장됩니다";
+"nft_asset.save_to_photos.failed" = "NFT 이미지를 저장하지 못했습니다";

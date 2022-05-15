@@ -7,46 +7,49 @@ extension MarketKit.CoinType {
         switch self {
         case .erc20: return "ERC20"
         case .bep20: return "BEP20"
+        case .polygon, .mrc20: return "POLYGON"
         case .bep2: return "BEP2"
-        default: ()
+        default: return nil
         }
-
-        return nil
     }
 
     var platformType: String {
         switch self {
-        case .ethereum, .erc20: return "Ethereum"
-        case .binanceSmartChain, .bep20: return "Binance Smart Chain"
-        case .bep2: return "Binance"
+        case .ethereum: return "Ethereum"
+        case .erc20: return "ERC20"
+        case .binanceSmartChain: return "Binance Smart Chain"
+        case .bep20: return "BEP20"
+        case .polygon, .mrc20: return "Polygon"
+        case .bep2: return "BEP2"
         default: return ""
         }
     }
 
     var platformCoinType: String {
         switch self {
-        case .ethereum, .binanceSmartChain: return "coin_platforms.native".localized
-        case .erc20: return "ERC20"
-        case .bep20: return "BEP20"
-        case .bep2: return "BEP2"
+        case .ethereum, .binanceSmartChain, .polygon: return "coin_platforms.native".localized
+        case .erc20(let address): return address.shortenedAddress
+        case .bep20(let address): return address.shortenedAddress
+        case .mrc20(let address): return address.shortenedAddress
+        case .bep2(let symbol): return symbol
         default: return ""
+        }
+    }
+
+    var platformIcon: String? {
+        switch self {
+        case .ethereum, .erc20: return "ethereum_24"
+        case .binanceSmartChain, .bep20: return "binance_smart_chain_24"
+        case .polygon, .mrc20: return "polygon_24"
+        case .bep2: return "binance_chain_24"
+        default: return nil
         }
     }
 
     var swappable: Bool {
         switch self {
-        case .ethereum, .erc20, .binanceSmartChain, .bep20: return true
+        case .ethereum, .erc20, .binanceSmartChain, .bep20, .polygon, .mrc20: return true
         default: return false
-        }
-    }
-
-    var restoreUrl: String {
-        switch self {
-        case .bitcoin: return "https://btc.horizontalsystems.xyz/apg"
-        case .litecoin: return "https://ltc.horizontalsystems.xyz/api"
-        case .bitcoinCash: return "https://explorer.bitcoin.com/bch/"
-        case .dash: return "https://dash.horizontalsystems.xyz"
-        default: return ""
         }
     }
 
@@ -84,7 +87,7 @@ extension MarketKit.CoinType {
 
     var isSupported: Bool {
         switch self {
-        case .bitcoin, .litecoin, .bitcoinCash, .dash, .ethereum, .zcash, .binanceSmartChain, .erc20, .bep20, .bep2: return true
+        case .bitcoin, .litecoin, .bitcoinCash, .dash, .ethereum, .zcash, .binanceSmartChain, .polygon, .erc20, .bep20, .bep2, .mrc20: return true
         default: return false
         }
     }
@@ -95,22 +98,30 @@ extension MarketKit.CoinType {
 
     var order: Int {
         switch self {
-        case .erc20: return 1
-        case .bep20: return 2
-        case .bep2: return 3
-        case .solana: return 4
-        case .avalanche: return 5
-        case .fantom: return 6
-        case .arbitrumOne: return 7
-        case .polygonPos: return 8
-        case .huobiToken: return 9
-        case .harmonyShard0: return 10
-        case .xdai: return 11
-        case .moonriver: return 12
-        case .okexChain: return 13
-        case .sora: return 14
-        case .tomochain: return 15
-        case .iotex: return 16
+        case .bitcoin: return 1
+        case .bitcoinCash: return 2
+        case .litecoin: return 3
+        case .dash: return 4
+        case .zcash: return 5
+        case .ethereum: return 6
+        case .binanceSmartChain: return 7
+        case .polygon: return 8
+        case .erc20: return 9
+        case .bep20: return 10
+        case .mrc20: return 11
+        case .bep2: return 12
+        case .solana: return 13
+        case .avalanche: return 14
+        case .fantom: return 15
+        case .arbitrumOne: return 16
+        case .huobiToken: return 17
+        case .harmonyShard0: return 18
+        case .xdai: return 19
+        case .moonriver: return 20
+        case .okexChain: return 21
+        case .sora: return 22
+        case .tomochain: return 23
+        case .iotex: return 24
         default: return Int.max
         }
     }
@@ -126,6 +137,14 @@ extension MarketKit.Coin {
     var imageUrl: String {
         let scale = Int(UIScreen.main.scale)
         return "https://markets.nyc3.digitaloceanspaces.com/coin-icons/\(uid)@\(scale)x.png"
+    }
+
+}
+
+extension MarketKit.FullCoin {
+
+    var supportedPlatforms: [Platform] {
+        platforms.filter { $0.coinType.isSupported }
     }
 
 }
@@ -211,6 +230,22 @@ extension Array where Element == FullCoin {
 
             return lhsFullCoin.coin.name.lowercased() < rhsFullCoin.coin.name.lowercased()
         }
+    }
+
+}
+
+extension Array where Element == CoinType {
+
+    var sorted: [CoinType] {
+        sorted { $0.order < $1.order }
+    }
+
+}
+
+extension Array where Element == Platform {
+
+    var sorted: [Platform] {
+        sorted { $0.coinType.order < $1.coinType.order }
     }
 
 }

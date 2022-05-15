@@ -4,59 +4,71 @@ import EthereumKit
 import Erc20Kit
 import UniswapKit
 import OneInchKit
-
-protocol IEvmKitManagerDataSource {
-    var explorerApiKey: String { get }
-    var evmNetworkObservable: Observable<(Account, EvmNetwork)> { get }
-    func evmNetwork(account: Account) -> EvmNetwork
-}
+import HdWalletKit
 
 class EvmKitManager {
-    private let dataSource: IEvmKitManagerDataSource
+    let chain: Chain
+    private let syncSourceManager: EvmSyncSourceManager
     private let disposeBag = DisposeBag()
 
-    private weak var _evmKit: EthereumKit.Kit?
+    private weak var _evmKitWrapper: EvmKitWrapper?
 
+    private let evmKitCreatedRelay = PublishRelay<Void>()
     private let evmKitUpdatedRelay = PublishRelay<Void>()
     private var currentAccount: Account?
 
     private let queue = DispatchQueue(label: "io.horizontalsystems.unstoppable.ethereum-kit-manager", qos: .userInitiated)
 
-    init(dataSource: IEvmKitManagerDataSource) {
-        self.dataSource = dataSource
+    init(chain: Chain, syncSourceManager: EvmSyncSourceManager) {
+        self.chain = chain
+        self.syncSourceManager = syncSourceManager
 
-        subscribe(disposeBag, dataSource.evmNetworkObservable) { [weak self] account, _ in
-            self?.handleUpdatedNetwork(account: account)
+        subscribe(disposeBag, syncSourceManager.syncSourceObservable) { [weak self] account, blockchain, _ in
+            self?.handleUpdatedSyncSource(account: account, blockchain: blockchain)
         }
     }
 
-    private func handleUpdatedNetwork(account: Account) {
+    private func handleUpdatedSyncSource(account: Account, blockchain: EvmBlockchain) {
         queue.sync {
-            guard account == currentAccount else {
+            guard let _evmKitWrapper = _evmKitWrapper else {
                 return
             }
 
-            _evmKit = nil
+            guard account == currentAccount, _evmKitWrapper.blockchain == blockchain else {
+                return
+            }
+
+            self._evmKitWrapper = nil
             evmKitUpdatedRelay.accept(())
         }
     }
 
-    private func _evmKit(account: Account) throws -> EthereumKit.Kit {
-        if let _evmKit = _evmKit, let currentAccount = currentAccount, currentAccount == account {
-            return _evmKit
+    private func _evmKitWrapper(account: Account, blockchain: EvmBlockchain) throws -> EvmKitWrapper {
+        if let _evmKitWrapper = _evmKitWrapper, let currentAccount = currentAccount, currentAccount == account {
+            return _evmKitWrapper
         }
 
-        guard let seed = account.type.mnemonicSeed else {
+        let syncSource = syncSourceManager.syncSource(account: account, blockchain: blockchain)
+
+        let address: EthereumKit.Address
+        var signer: Signer?
+
+        switch account.type {
+        case let .mnemonic(words, salt):
+            let seed = Mnemonic.seed(mnemonic: words, passphrase: salt)
+            address = try Signer.address(seed: seed, chain: chain)
+            signer = try Signer.instance(seed: seed, chain: chain)
+        case let .address(value):
+            address = value
+        default:
             throw AdapterError.unsupportedAccount
         }
 
-        let evmNetwork = dataSource.evmNetwork(account: account)
-
         let evmKit = try EthereumKit.Kit.instance(
-                seed: seed,
-                networkType: evmNetwork.networkType,
-                syncSource: evmNetwork.syncSource,
-                etherscanApiKey: dataSource.explorerApiKey,
+                address: address,
+                chain: chain,
+                rpcSource: syncSource.rpcSource,
+                transactionSource: syncSource.transactionSource,
                 walletId: account.id,
                 minLogLevel: .error
         )
@@ -72,72 +84,71 @@ class EvmKitManager {
 
         evmKit.start()
 
-        _evmKit = evmKit
+        let wrapper = EvmKitWrapper(blockchain: blockchain, evmKit: evmKit, signer: signer)
+
+        _evmKitWrapper = wrapper
         currentAccount = account
 
-        return evmKit
+        evmKitCreatedRelay.accept(())
+
+        return wrapper
     }
 
 }
 
 extension EvmKitManager {
 
+    var evmKitCreatedObservable: Observable<Void> {
+        evmKitCreatedRelay.asObservable()
+    }
+
     var evmKitUpdatedObservable: Observable<Void> {
         evmKitUpdatedRelay.asObservable()
     }
 
-    var evmKit: EthereumKit.Kit? {
-        queue.sync { _evmKit }
+    var evmKitWrapper: EvmKitWrapper? {
+        queue.sync { _evmKitWrapper }
     }
 
-    func evmKit(account: Account) throws -> EthereumKit.Kit {
-        try queue.sync { try _evmKit(account: account)  }
-    }
-
-}
-
-class EthKitManagerDataSource: IEvmKitManagerDataSource {
-    private let appConfigProvider: AppConfigProvider
-    private let accountSettingManager: AccountSettingManager
-
-    init(appConfigProvider: AppConfigProvider, accountSettingManager: AccountSettingManager) {
-        self.appConfigProvider = appConfigProvider
-        self.accountSettingManager = accountSettingManager
-    }
-
-    var explorerApiKey: String {
-        appConfigProvider.etherscanKey
-    }
-
-    var evmNetworkObservable: Observable<(Account, EvmNetwork)> {
-        accountSettingManager.ethereumNetworkObservable
-    }
-
-    func evmNetwork(account: Account) -> EvmNetwork {
-        accountSettingManager.ethereumNetwork(account: account)
+    func evmKitWrapper(account: Account, blockchain: EvmBlockchain) throws -> EvmKitWrapper {
+        try queue.sync { try _evmKitWrapper(account: account, blockchain: blockchain)  }
     }
 
 }
 
-class BscKitManagerDataSource: IEvmKitManagerDataSource {
-    private let appConfigProvider: AppConfigProvider
-    private let accountSettingManager: AccountSettingManager
+class EvmKitWrapper {
+    let blockchain: EvmBlockchain
+    let evmKit: EthereumKit.Kit
+    let signer: Signer?
 
-    init(appConfigProvider: AppConfigProvider, accountSettingManager: AccountSettingManager) {
-        self.appConfigProvider = appConfigProvider
-        self.accountSettingManager = accountSettingManager
+    init(blockchain: EvmBlockchain, evmKit: EthereumKit.Kit, signer: Signer?) {
+        self.blockchain = blockchain
+        self.evmKit = evmKit
+        self.signer = signer
     }
 
-    var explorerApiKey: String {
-        appConfigProvider.bscscanKey
+    func sendSingle(transactionData: TransactionData, gasPrice: GasPrice, gasLimit: Int, nonce: Int? = nil) -> Single<FullTransaction> {
+        guard let signer = signer else {
+            return Single.error(SignerError.signerNotSupported)
+        }
+
+        return evmKit.rawTransaction(transactionData: transactionData, gasPrice: gasPrice, gasLimit: gasLimit, nonce: nonce)
+                .flatMap { [unowned self] rawTransaction in
+                    do {
+                        let signature = try signer.signature(rawTransaction: rawTransaction)
+                        return evmKit.sendSingle(rawTransaction: rawTransaction, signature: signature)
+                    } catch {
+                        return Single.error(error)
+                    }
+                }
     }
 
-    var evmNetworkObservable: Observable<(Account, EvmNetwork)> {
-        accountSettingManager.binanceSmartChainNetworkObservable
-    }
+}
 
-    func evmNetwork(account: Account) -> EvmNetwork {
-        accountSettingManager.binanceSmartChainNetwork(account: account)
+extension EvmKitWrapper {
+
+    enum SignerError: Error {
+        case signerNotSupported
     }
 
 }

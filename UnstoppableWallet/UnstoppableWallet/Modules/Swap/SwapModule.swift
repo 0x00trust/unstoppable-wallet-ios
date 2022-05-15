@@ -42,7 +42,7 @@ protocol ISwapDataSource: AnyObject {
 class SwapModule {
 
     static func viewController(platformCoinFrom: PlatformCoin? = nil) -> UIViewController? {
-        let swapDexManager = SwapProviderManager(localStorage: App.shared.localStorage, platformCoinFrom: platformCoinFrom)
+        let swapDexManager = SwapProviderManager(localStorage: App.shared.localStorage, evmBlockchainManager: App.shared.evmBlockchainManager, platformCoinFrom: platformCoinFrom)
 
         let viewModel =  SwapViewModel(dexManager: swapDexManager)
         let viewController = SwapViewController(
@@ -79,7 +79,7 @@ extension SwapModule {
     }
 
     class Dex {
-        var blockchain: Blockchain {
+        var blockchain: EvmBlockchain {
             didSet {
                 let allowedProviders = blockchain.allowedProviders
                 if !allowedProviders.contains(provider) {
@@ -96,7 +96,7 @@ extension SwapModule {
             }
         }
 
-        init(blockchain: Blockchain, provider: Provider) {
+        init(blockchain: EvmBlockchain, provider: Provider) {
             self.blockchain = blockchain
             self.provider = provider
         }
@@ -115,49 +115,59 @@ extension SwapModule {
 
 }
 
-extension SwapModule.Dex {
+extension EvmBlockchain {
 
-    enum Blockchain: String {
-        case ethereum
-        case binanceSmartChain
-
-        var allowedProviders: [Provider] {
-            switch self {
-            case .ethereum: return isMainNet ? [.oneInch, .uniswap] : [.uniswap]
-            case .binanceSmartChain: return isMainNet ? [.oneInch, .pancake] : [.pancake]
-            }
+    var allowedProviders: [SwapModule.Dex.Provider] {
+        switch self {
+        case .ethereum: return [.oneInch, .uniswap]
+        case .binanceSmartChain: return [.oneInch, .pancake]
+        case .polygon: return [.oneInch, .quickSwap]
         }
-
-        var evmKit: EthereumKit.Kit? {
-            switch self {
-            case .ethereum: return App.shared.ethereumKitManager.evmKit
-            case .binanceSmartChain: return App.shared.binanceSmartChainKitManager.evmKit
-            }
-        }
-
-        var platformCoin: PlatformCoin? {
-            switch self {
-            case .ethereum: return try? App.shared.marketKit.platformCoin(coinType: .ethereum)
-            case .binanceSmartChain: return try? App.shared.marketKit.platformCoin(coinType: .binanceSmartChain)
-            }
-        }
-
-        var isMainNet: Bool {
-            evmKit?.networkType.isMainNet ?? true
-        }
-
     }
+
+}
+
+extension SwapModule.Dex {
 
     enum Provider: String {
         case uniswap = "Uniswap"
         case oneInch = "1Inch"
         case pancake = "PancakeSwap"
+        case quickSwap = "QuickSwap"
 
-        var allowedBlockchains: [Blockchain] {
+        var allowedBlockchains: [EvmBlockchain] {
             switch self {
-            case .oneInch: return [.ethereum, .binanceSmartChain]
             case .uniswap: return [.ethereum]
+            case .oneInch: return [.ethereum, .binanceSmartChain, .polygon]
             case .pancake: return [.binanceSmartChain]
+            case .quickSwap: return [.polygon]
+            }
+        }
+
+        var infoUrl: String {
+            switch self {
+            case .uniswap: return "https://uniswap.org/"
+            case .oneInch: return "https://app.1inch.io/"
+            case .pancake: return "https://pancakeswap.finance/"
+            case .quickSwap: return "https://quickswap.exchange/"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .uniswap: return "Uniswap v.2"
+            case .oneInch: return "1Inch"
+            case .pancake: return "PancakeSwap"
+            case .quickSwap: return "QuickSwap"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .uniswap: return "uniswap_24"
+            case .oneInch: return "1inch_24"
+            case .pancake: return "pancake_24"
+            case .quickSwap: return "quick_24"
             }
         }
 

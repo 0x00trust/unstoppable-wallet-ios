@@ -7,7 +7,9 @@ import BigInt
 
 class SendEvmService {
     let sendPlatformCoin: PlatformCoin
+    private let disposeBag = DisposeBag()
     private let adapter: ISendEthereumAdapter
+    private let addressService: AddressService
 
     private let stateRelay = PublishRelay<State>()
     private(set) var state: State = .notReady {
@@ -19,10 +21,10 @@ class SendEvmService {
     private var evmAmount: BigUInt?
     private var addressData: AddressData?
 
-    private let amountErrorRelay = PublishRelay<Error?>()
-    private var amountError: Error? {
+    private let amountCautionRelay = PublishRelay<(error: Error?, warning: AmountWarning?)>()
+    private var amountCaution: (error: Error?, warning: AmountWarning?) = (error: nil, warning: nil) {
         didSet {
-            amountErrorRelay.accept(amountError)
+            amountCautionRelay.accept(amountCaution)
         }
     }
 
@@ -33,17 +35,34 @@ class SendEvmService {
         }
     }
 
-    init(platformCoin: PlatformCoin, adapter: ISendEthereumAdapter) {
+    init(platformCoin: PlatformCoin, adapter: ISendEthereumAdapter, addressService: AddressService) {
         sendPlatformCoin = platformCoin
         self.adapter = adapter
+        self.addressService = addressService
+
+        subscribe(disposeBag, addressService.stateObservable) { [weak self] in self?.sync(addressState: $0) }
+    }
+
+    private func sync(addressState: AddressService.State) {
+        switch addressState {
+        case .success(let address):
+            do {
+                addressData = AddressData(evmAddress: try EthereumKit.Address(hex: address.raw), domain: address.domain)
+            } catch {
+                addressData = nil
+            }
+        default: addressData = nil
+        }
+
+        syncState()
     }
 
     private func syncState() {
-        if amountError == nil, addressError == nil, let evmAmount = evmAmount, let addressData = addressData {
+        if amountCaution.error == nil, case .success = addressService.state, let evmAmount = evmAmount, let addressData = addressData {
             let transactionData = adapter.transactionData(amount: evmAmount, address: addressData.evmAddress)
             let sendInfo = SendEvmData.SendInfo(domain: addressData.domain)
 
-            let sendData = SendEvmData(transactionData: transactionData, additionalInfo: .send(info: sendInfo))
+            let sendData = SendEvmData(transactionData: transactionData, additionalInfo: .send(info: sendInfo), warnings: [])
             state = .ready(sendData: sendData)
         } else {
             state = .notReady
@@ -70,8 +89,8 @@ extension SendEvmService {
         stateRelay.asObservable()
     }
 
-    var amountErrorObservable: Observable<Error?> {
-        amountErrorRelay.asObservable()
+    var amountCautionObservable: Observable<(error: Error?, warning: AmountWarning?)> {
+        amountCautionRelay.asObservable()
     }
 
 }
@@ -110,54 +129,26 @@ extension SendEvmService: IAmountInputService {
         if amount > 0 {
             do {
                 evmAmount = try validEvmAmount(amount: amount)
-                amountError = nil
+
+                var amountWarning: AmountWarning? = nil
+                if amount.isEqual(to: adapter.balanceData.balance) {
+                    switch sendPlatformCoin.coinType {
+                    case .binanceSmartChain, .ethereum: amountWarning = AmountWarning.coinNeededForFee
+                    default: ()
+                    }
+                }
+
+                amountCaution = (error: nil, warning: amountWarning)
             } catch {
                 evmAmount = nil
-                amountError = error
+                amountCaution = (error: error, warning: nil)
             }
         } else {
             evmAmount = nil
-            amountError = nil
+            amountCaution = (error: nil, warning: nil)
         }
 
         syncState()
-    }
-
-}
-
-extension SendEvmService: IRecipientAddressService {
-
-    var initialAddress: Address? {
-        nil
-    }
-
-    var recipientError: Error? {
-        addressError
-    }
-
-    var recipientErrorObservable: Observable<Error?> {
-        addressErrorRelay.asObservable()
-    }
-
-    func set(address: Address?) {
-        if let address = address, !address.raw.isEmpty {
-            do {
-                addressData = AddressData(evmAddress: try EthereumKit.Address(hex: address.raw), domain: address.domain)
-                addressError = nil
-            } catch {
-                addressData = nil
-                addressError = error.convertedError
-            }
-        } else {
-            addressData = nil
-            addressError = nil
-        }
-
-        syncState()
-    }
-
-    func set(amount: Decimal) {
-        // todo
     }
 
 }
@@ -172,6 +163,10 @@ extension SendEvmService {
     enum AmountError: Error {
         case invalidDecimal
         case insufficientBalance
+    }
+
+    enum AmountWarning {
+        case coinNeededForFee
     }
 
     private struct AddressData {

@@ -9,19 +9,22 @@ import MarketKit
 class EvmTransactionsAdapter: BaseEvmAdapter {
     static let decimal = 18
 
+    private let evmTransactionSource: EthereumKit.TransactionSource
     private let transactionConverter: EvmTransactionConverter
 
-    init(evmKit: EthereumKit.Kit, source: TransactionSource, baseCoin: PlatformCoin, coinManager: CoinManager) {
-        transactionConverter = EvmTransactionConverter(source: source, baseCoin: baseCoin, coinManager: coinManager, evmKit: evmKit)
+    init(evmKitWrapper: EvmKitWrapper, source: TransactionSource, baseCoin: PlatformCoin, evmTransactionSource: EthereumKit.TransactionSource, coinManager: CoinManager) {
+        self.evmTransactionSource = evmTransactionSource
+        transactionConverter = EvmTransactionConverter(source: source, baseCoin: baseCoin, coinManager: coinManager, evmKitWrapper: evmKitWrapper)
 
-        super.init(evmKit: evmKit, decimals: EvmAdapter.decimals)
+        super.init(evmKitWrapper: evmKitWrapper, decimals: EvmAdapter.decimals)
     }
 
     private func coinTagName(coin: PlatformCoin) -> String {
         switch coin.coinType {
-        case .ethereum, .binanceSmartChain: return TransactionTag.evmCoin
+        case .ethereum, .binanceSmartChain, .polygon: return TransactionTag.evmCoin
         case .erc20(let address): return address
         case .bep20(let address): return address
+        case .mrc20(let address): return address
         default: return ""
         }
     }
@@ -30,12 +33,7 @@ class EvmTransactionsAdapter: BaseEvmAdapter {
         var coinFilter = [[String]]()
 
         if let coin = coin {
-            switch coin.coinType {
-            case .ethereum, .binanceSmartChain: coinFilter.append([TransactionTag.evmCoin])
-            case .erc20(let address): coinFilter.append([address])
-            case .bep20(let address): coinFilter.append([address])
-            default: ()
-            }
+            coinFilter.append([coinTagName(coin: coin)])
         }
 
         switch filter {
@@ -74,25 +72,11 @@ extension EvmTransactionsAdapter: ITransactionsAdapter {
     }
 
     var explorerTitle: String {
-        switch evmKit.networkType {
-        case .ethMainNet, .ropsten, .rinkeby, .kovan, .goerli: return "etherscan.io"
-        case .bscMainNet: return "bscscan.com"
-        }
+        evmTransactionSource.name
     }
 
     func explorerUrl(transactionHash: String) -> String? {
-        let domain: String
-
-        switch evmKit.networkType {
-        case .ethMainNet: domain = "etherscan.io"
-        case .bscMainNet: domain = "bscscan.com"
-        case .ropsten: domain = "ropsten.etherscan.io"
-        case .rinkeby: domain = "rinkeby.etherscan.io"
-        case .kovan: domain = "kovan.etherscan.io"
-        case .goerli: domain = "goerli.etherscan.io"
-        }
-
-        return "https://\(domain)/tx/" + transactionHash
+        evmTransactionSource.transactionUrl(hash: transactionHash)
     }
 
     func transactionsObservable(coin: PlatformCoin?, filter: TransactionTypeFilter) -> Observable<[TransactionRecord]> {

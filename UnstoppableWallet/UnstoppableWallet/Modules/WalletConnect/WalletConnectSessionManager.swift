@@ -8,7 +8,7 @@ class WalletConnectSessionManager {
     private let accountSettingManager: AccountSettingManager
     private let disposeBag = DisposeBag()
 
-    private let sessionsRelay = PublishRelay<[WalletConnectSession]>()
+    private let sessionsRelay = BehaviorRelay<[WalletConnectSession]>(value: [])
 
     init(storage: IWalletConnectSessionStorage, accountManager: IAccountManager, accountSettingManager: AccountSettingManager) {
         self.storage = storage
@@ -29,8 +29,7 @@ class WalletConnectSessionManager {
                 })
                 .disposed(by: disposeBag)
 
-        subscribe(disposeBag, accountSettingManager.ethereumNetworkObservable) { [weak self] _, _ in self?.syncSessions() }
-        subscribe(disposeBag, accountSettingManager.binanceSmartChainNetworkObservable) { [weak self] _, _ in self?.syncSessions() }
+        syncSessions()
     }
 
     private func handleDeleted(account: Account) {
@@ -55,10 +54,7 @@ extension WalletConnectSessionManager {
             return []
         }
 
-        let ethereumChainId = accountSettingManager.ethereumNetwork(account: activeAccount).networkType.chainId
-        let binanceSmartChainChainId = accountSettingManager.binanceSmartChainNetwork(account: activeAccount).networkType.chainId
-
-        return storage.sessions(accountId: activeAccount.id, chainIds: [ethereumChainId, binanceSmartChainChainId])
+        return storage.sessions(accountId: activeAccount.id)
     }
 
     var sessionsObservable: Observable<[WalletConnectSession]> {

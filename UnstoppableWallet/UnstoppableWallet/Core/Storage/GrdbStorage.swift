@@ -10,12 +10,8 @@ import MarketKit
 class GrdbStorage {
     private let dbPool: DatabasePool
 
-    init() {
-        let databaseURL = try! FileManager.default
-                .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-                .appendingPathComponent("bank.sqlite")
-
-        dbPool = try! DatabasePool(path: databaseURL.path)
+    init(dbPool: DatabasePool) {
+        self.dbPool = dbPool
 
         try! migrator.migrate(dbPool)
     }
@@ -547,6 +543,7 @@ class GrdbStorage {
             }
         }
 
+
         migrator.registerMigration("createCustomTokens") { db in
             try db.create(table: CustomToken.databaseTableName) { t in
                 t.column(CustomToken.Columns.coinName.name, .text).notNull()
@@ -561,6 +558,25 @@ class GrdbStorage {
         migrator.registerMigration("newStructureForFavoriteCoins") { db in
             try db.create(table: FavoriteCoinRecord.databaseTableName) { t in
                 t.column(FavoriteCoinRecord.Columns.coinUid.name, .text).primaryKey()
+            }
+        }
+
+        migrator.registerMigration("createEvmAccountSyncStates") { db in
+            try db.create(table: EvmAccountSyncState.databaseTableName) { t in
+                t.column(EvmAccountSyncState.Columns.accountId.name, .text).notNull()
+                t.column(EvmAccountSyncState.Columns.chainId.name, .integer).notNull()
+                t.column(EvmAccountSyncState.Columns.lastBlockNumber.name, .integer).notNull()
+
+                t.primaryKey([EvmAccountSyncState.Columns.accountId.name, EvmAccountSyncState.Columns.chainId.name], onConflict: .replace)
+            }
+        }
+
+        migrator.registerMigration("createWalletConnectV2Sessions") { db in
+            try db.create(table: WalletConnectV2Session.databaseTableName) { t in
+                t.column(WalletConnectV2Session.Columns.accountId.name, .text).notNull()
+                t.column(WalletConnectV2Session.Columns.topic.name, .text).notNull()
+
+                t.primaryKey([WalletConnectV2Session.Columns.accountId.name, WalletConnectV2Session.Columns.topic.name], onConflict: .replace)
             }
         }
 
@@ -753,9 +769,15 @@ extension GrdbStorage: ILogRecordStorage {
 
 extension GrdbStorage: IWalletConnectSessionStorage {
 
-    func sessions(accountId: String, chainIds: [Int]) -> [WalletConnectSession] {
+    func sessions(accountId: String) -> [WalletConnectSession] {
         try! dbPool.read { db in
-            try WalletConnectSession.filter(WalletConnectSession.Columns.accountId == accountId && chainIds.contains(WalletConnectSession.Columns.chainId)).fetchAll(db)
+            try WalletConnectSession.filter(WalletConnectSession.Columns.accountId == accountId).fetchAll(db)
+        }
+    }
+
+    func session(peerId: String, accountId: String) -> WalletConnectSession? {
+        try! dbPool.read { db in
+            try WalletConnectSession.filter(WalletConnectSession.Columns.peerId == peerId && WalletConnectSession.Columns.accountId == accountId).fetchOne(db)
         }
     }
 
@@ -774,6 +796,42 @@ extension GrdbStorage: IWalletConnectSessionStorage {
     func deleteSessions(accountId: String) {
         _ = try! dbPool.write { db in
             try WalletConnectSession.filter(WalletConnectSession.Columns.accountId == accountId).deleteAll(db)
+        }
+    }
+
+}
+
+extension GrdbStorage: IWalletConnectV2SessionStorage {
+
+    func sessionsV2(accountId: String?) -> [WalletConnectV2Session] {
+        try! dbPool.read { db in
+            var request = WalletConnectV2Session.all()
+            if let accountId = accountId {
+                request = request.filter(WalletConnectV2Session.Columns.accountId == accountId)
+            }
+            return try request.fetchAll(db)
+        }
+    }
+
+    func save(sessions: [WalletConnectV2Session]) {
+        _ = try! dbPool.write { db in
+            for session in sessions {
+                try session.insert(db)
+            }
+        }
+    }
+
+    func deleteSessionV2(topics: [String]) {
+        _ = try! dbPool.write { db in
+            for topic in topics {
+                try WalletConnectV2Session.filter(WalletConnectV2Session.Columns.topic == topic).deleteAll(db)
+            }
+        }
+    }
+
+    func deleteSessionsV2(accountId: String) {
+        _ = try! dbPool.write { db in
+            try WalletConnectV2Session.filter(WalletConnectV2Session.Columns.accountId == accountId).deleteAll(db)
         }
     }
 
@@ -918,6 +976,22 @@ extension GrdbStorage: ICustomTokenStorage {
             for customToken in customTokens {
                 try customToken.insert(db)
             }
+        }
+    }
+
+}
+
+extension GrdbStorage: IEvmAccountSyncStateStorage {
+
+    func evmAccountSyncState(accountId: String, chainId: Int) -> EvmAccountSyncState? {
+        try! dbPool.read { db in
+            try EvmAccountSyncState.filter(EvmAccountSyncState.Columns.accountId == accountId && EvmAccountSyncState.Columns.chainId == chainId).fetchOne(db)
+        }
+    }
+
+    func save(evmAccountSyncState: EvmAccountSyncState) {
+        _ = try! dbPool.write { db in
+            try evmAccountSyncState.insert(db)
         }
     }
 

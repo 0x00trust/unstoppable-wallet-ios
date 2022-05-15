@@ -6,11 +6,12 @@ class CoinManager {
     private let featuredCoinUids: [String] = [
         "bitcoin",
         "ethereum",
-        "bitcoin-cash",
-        "zcash",
         "binancecoin",
+        "matic-network",
+        "zcash",
         "dash",
         "litecoin",
+        "bitcoin-cash",
         "uniswap",
         "sushi",
         "pancakeswap-token",
@@ -101,6 +102,10 @@ extension CoinManager {
         let kitFullCoins = try marketKit.fullCoins(filter: filter, limit: limit)
 
         return appFullCoins + kitFullCoins
+    }
+
+    func fullCoins(coinUids: [String]) throws -> [FullCoin] {
+        try marketKit.fullCoins(coinUids: coinUids)
     }
 
     func platformCoin(coinType: CoinType) throws -> PlatformCoin? {

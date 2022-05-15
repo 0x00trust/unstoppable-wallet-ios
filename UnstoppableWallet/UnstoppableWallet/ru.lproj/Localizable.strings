@@ -1,8 +1,9 @@
-"button.ok" = "Хорошо";
+"button.ok" = "OK";
 "button.apply" = "Применить";
 "button.cancel" = "Отменить";
 "button.close" = "Закрыть";
 "button.done" = "Готово";
+"button.reset" = "Сбросить";
 "button.restore" = "Восстановить";
 "button.next" = "Далее";
 "button.share" = "Поделиться";
@@ -17,8 +18,9 @@
 "button.connect" = "Подключиться";
 "button.save" = "Сохранить";
 "button.sign" = "Подписать";
-"button.more" = "Показать еще";
+"button.more" = "Показать Ещё";
 
+"alert" = "Предупреждение";
 "alert.copied" = "Скопировано";
 "alert.no_internet" = "Нет Интернета";
 "alert.wrong_amount" = "Неверная Сумма";
@@ -88,8 +90,9 @@
 "show_key.description" = "Показанные далее фразы для восстановления являются единственным способом восстановления ваших средств в случае потери, кражи или поломки вашего телефона.\n\nУбедитесь, что никто не смотрит на ваш экран.";
 "show_key.button_show" = "Показать";
 "show_key.tab.recovery_phrase" = "Фраза для восстановления";
-"show_key.tab.private_keys" = "Приватные Ключи";
+"show_key.tab.private_key" = "Приватный Ключ";
 "show_key.passphrase" = "Кодовая Фраза";
+"show_key.private_key.description" = "Этот ключ для всех EVM-совместимых блокчейнов.";
 
 "private_key_copying.title" = "Внимание";
 "private_key_copying.subtitle" = "Риск копирования Секретного ключа";
@@ -140,6 +143,7 @@
 "balance.add_coin" = "Добавить Токен";
 "balance.empty.add_coins" = "Добавить Токены";
 "balance.empty.description" = "Вы еще не добавили монеты в этот кошелек.";
+"balance.watch_empty.description" = "У кошелька с этим адресом нет баланса";
 "balance.sort_by" = "Сортировать по";
 "balance.sort.header" = "Сортировать";
 "balance.sort.valueHighToLow" = "По Балансу";
@@ -181,7 +185,6 @@
 "send.tx_speed_recommended" = "Рекомендовано";
 "send.tx_speed_high" = "Высокая";
 "send.tx_speed_custom" = "Индивидуальная";
-"send.tx_duration" = "Продолжительность";
 "send.duration.hours" = "%d ч.";
 "send.duration.minutes" = "%d мин.";
 "send.available_balance" = "Доступный Баланс";
@@ -207,7 +210,6 @@
 
 "send.confirmation.you_send" = "Вы Отправляете";
 "send.confirmation.to" = "Кому";
-"send.confirmation.method" = "Метод";
 "send.confirmation.domain" = "Домен";
 "send.confirmation.address" = "Адрес";
 "send.confirmation.account" = "Aккаунт";
@@ -218,10 +220,12 @@
 "send.confirmation.resend_button" = "Отправить Повторно";
 "send.confirmation.cancel_description" = "Это действие аннулирует предыдущую транзакцию, переотправив ее себе как транзакцию с нулевой суммой. Если исходная транзакция ожидает обработки во время отправки новой, то вероятность ее аннулирования и замены довольно высока. Только одна из этих двух транзакций будет включена в блокчейн.";
 "send.confirmation.cancel_button" = "Отменить Транзакцию";
+"send.confirmation.nonce" = "Nonce";
 "send.amount_error.balance" = "Недостаточно Средств";
 "send.amount_error.maximum_amount" = "Макс. сумма %@";
 "send.amount_error.minimum_amount" = "Мин. сумма %@";
 "send.amount_error.min_required_balance" = "Мин. обязательный остаток %@";
+"send.amount_warning.coin_needed_for_fee" = "Вы можете оставить некоторую сумму в размере %@ на балансе, чтобы оплачивать будущие транзакции.";
 "send.token.insufficient_fee_alert" = "Комиссии за транзакцию %@ (%@) взимаются в %@. Вам нужно %@.";
 "send.stuck_warning" = "Внимание! Транзакция может застрять в сети";
 
@@ -240,7 +244,6 @@
 "swap.you_pay" = "Платите";
 "swap.estimated" = "приблизительно";
 "swap.balance" = "Баланс";
-"swap.powered_by" = "При поддержке";
 "swap.allowance" = "Разрешение";
 "swap.you_get" = "Получите";
 "swap.token" = "Выбрать";
@@ -252,14 +255,13 @@
 "swap.approving_button" = "Разрешение...";
 "swap.trade_error.not_found" = "Невозможно обменять эти токены";
 "swap.button_error.insufficient_balance" = "Недостаточный баланс";
-"swap.switch_provider.title" = "Смена провайдера";
-"swap.switch_provider.subtitle" = "Переключатель";
+"swap.switch_provider.title" = "Служба Обмена";
 
 "swap.price" = "Цена";
 "swap.buy_price" = "Цена покупки";
 "swap.sell_price" = "Цена продажи";
 "swap.price_impact" = "Отклонение от рын. цены";
-"swap.maximum_paid" = "Максимальная Выплата";
+"swap.maximum_paid" = "Макс. Сумма";
 "swap.minimum_got" = "Минимальная Выплата";
 "swap.estimate_short" = "(прим.)";
 "swap.minimum_short" = "(мин)";
@@ -280,8 +282,10 @@
 "swap.advanced_settings.error.invalid_slippage" = "Неверное Отклонение";
 "swap.advanced_settings.error.invalid_deadline" = "Недопустимый Срок";
 
-"swap.one_inch.error.cannot_estimate" = "Ошибка! Проверьте баланс и убедитесь, что на нем достаточно %@ для покрытия комиссии. Или попробуйте увеличить предел скольжения цены и повторите попытку снова. Следующая попытка через 3 секунды...";
-
+"swap.one_inch.error.cannot_estimate" = "Ошибка Оценки";
+"swap.one_inch.error.cannot_estimate.info" = "Проверьте баланс и убедитесь, что на нем достаточно %@ для покрытия комиссии. Или попробуйте увеличить предел скольжения цены и повторите попытку снова. Следующая попытка через 3 секунды...";
+"swap.one_inch.error.insufficient_liquidity" = "Недостаточно Ликвидности";
+"swap.one_inch.error.insufficient_liquidity.info" = "Кажется, для этой сделки не хватает ликвидности. Попробуйте уменьшить сумму сделки.";
 
 "swap.service" = "Сервис";
 "swap.service.title" = "Сервис";
@@ -293,9 +297,6 @@
 // Swap Confirmation
 
 "swap.confirmation.swap_button" = "Обменять";
-"swap.confirmation.guaranteed" = "Гарантировано";
-"swap.confirmation.maximum" = "Максимум";
-"swap.confirmation.estimated" = "Ориентировочно";
 "swap.confirmation.impact_too_high" = "Разница между рыночной ценой и ожидаемой расчетной ценой слишком высока.";
 
 "swap.dex_info.description" = "Этот обменный сервис работает при поддержке %@ - децентрализованного протокола обмена токенов, созданного в блокчейне %@.\n\n%@ полностью автоматизирован и управляется смарт-контрактами, которые надежным способом упрощают обмен токенами без осуществления каких-либо махинаций.";
@@ -327,7 +328,7 @@
 "market.category.overview" = "Обзор";
 "market.category.posts" = "Новости";
 "market.category.watchlist" = "Избранное";
-"market.total_market_cap" = "Полная Рыночная Капитализация";
+"market.total_market_cap" = "Общая Капитализация";
 "market.24h_volume" = "Объем торгов (24ч)";
 "market.defi_cap" = "Капитализация DeFi";
 "market.defi_tvl" = "TVL в DeFi";
@@ -365,57 +366,8 @@
 
 "market_discovery.title" = "Токены";
 "market_discovery.filters" = "Фильтры";
-"market_discovery.browse_categories" = "Посмотреть категории";
+"market_discovery.browse_categories" = "Обзор Категорий";
 "market_discovery.top_coins" = "Лучшие токены";
-
-"market_discovery.filter_title.blockchain" = "Blockchains";
-"market_discovery.filter_title.dexes" = "DEXes";
-"market_discovery.filter_title.lending" = "Lending";
-"market_discovery.filter_title.privacy" = "Конфиденциальность";
-"market_discovery.filter_title.scaling" = "Scaling";
-"market_discovery.filter_title.oracles" = "Oracles";
-"market_discovery.filter_title.prediction_markets" = "Prediction";
-"market_discovery.filter_title.yield_aggregators" = "Yield Aggregators";
-"market_discovery.filter_title.stablecoins" = "Stablecoins";
-"market_discovery.filter_title.tokenized_bitcoin" = "Tokenized Bitcoin";
-"market_discovery.filter_title.exchange_tokens" = "Exchange Tokens";
-"market_discovery.filter_title.risk_management" = "Risk Management";
-"market_discovery.filter_title.wallets" = "Wallets";
-"market_discovery.filter_title.synthetics" = "Synthetics";
-"market_discovery.filter_title.index_funds" = "Index Funds";
-"market_discovery.filter_title.nft" = "NFT";
-"market_discovery.filter_title.fundraising" = "Fundraising";
-"market_discovery.filter_title.gaming" = "Gaming";
-"market_discovery.filter_title.infrastructure" = "Infrastructure";
-"market_discovery.filter_title.analytics" = "Analytics";
-"market_discovery.filter_title.storage" = "Storage";
-"market_discovery.filter_title.identity" = "Identity";
-"market_discovery.filter_title.yield_tokens" = "Yield Tokens";
-
-
-"market_discovery.filter_description.blockchain" = "Нативные криптовалюты в основных блокчейнах.";
-"market_discovery.filter_description.dexes" = "Децентрализованные криптовалютные биржи.";
-"market_discovery.filter_description.lending" = "Протоколы для кредитования и ссуд.";
-"market_discovery.filter_description.privacy" = "Анонимные криптовалюты и решения для конфиденциальности.";
-"market_discovery.filter_description.scaling" = "Решения для ускорения транзакций в блокчейне.";
-"market_discovery.filter_description.oracles" = "Подключение данных реального мира к смарт-контрактам.";
-"market_discovery.filter_description.prediction_markets" = "Рынки для ставки на будущие события.";
-"market_discovery.filter_description.yield_aggregators" = "Решения для зарабатывания денег на мертвых криптоактивах.";
-"market_discovery.filter_description.stablecoins" = "Криптотокены, поддерживаемые в соотношении 1-1 с фиатной валютой.";
-"market_discovery.filter_description.tokenized_bitcoin" = "Криптотокены, поддерживаемые в соотношении 1-1 с ценой Bitcoin.";
-"market_discovery.filter_description.exchange_tokens" = "Токены централизованных бирж.";
-"market_discovery.filter_description.risk_management" = "Оценка рисков, страхование и хеджирование.";
-"market_discovery.filter_description.wallets" = "Токены криптовалютных кошельков.";
-"market_discovery.filter_description.synthetics" = "Платформы для создания децентрализованных синтетических активов.";
-"market_discovery.filter_description.index_funds" = "Активы, привязанные по цене к ряду токенов.";
-"market_discovery.filter_description.nft" = "NFT проекты.";
-"market_discovery.filter_description.fundraising" = "Платформы для фандрайзинга и продажи токенов.";
-"market_discovery.filter_description.gaming" = "Криптопроекты в игровом и VR секторах.";
-"market_discovery.filter_description.infrastructure" = "Проекты по созданию инфраструктурных решений.";
-"market_discovery.filter_description.analytics" = "Аналитика токенов и инвестиционных инструментов.";
-"market_discovery.filter_description.storage" = "Децентрализованное хранилище данных.";
-"market_discovery.filter_description.identity" = "Децентрализованная идентификация.";
-"market_discovery.filter_description.yield_tokens" = "Прибыльные токены";
 
 "market_watchlist.empty.caption" = "У вас нет токенов в избранном.";
 
@@ -429,11 +381,13 @@
 "market.advanced_search.24h" = "24ч";
 
 "market.advanced_search.market_parameters" = "Параметры Рынка";
+"market.advanced_search.network_parameters" = "Параметры Cети";
 "market.advanced_search.price_parameters" = "Параметры Цены";
 "market.advanced_search.choose_set" = "Выбрать Набор";
 "market.advanced_search.market_cap" = "Рыночная Капитализация";
 "market.advanced_search.volume" = "Объем Торговли";
 "market.advanced_search.liquidity" = "Ликвидность DEX";
+"market.advanced_search.blockchains" = "Блокчейны";
 "market.advanced_search.price_period" = "Ценовой Период";
 "market.advanced_search.price_change" = "Изменение Цены";
 
@@ -480,7 +434,7 @@
 
 "market.advanced_search_results.title" = "Результаты";
 
-"market.global.total_market_cap.title" = "Полная Рыночная Капитализация";
+"market.global.total_market_cap.title" = "Общая Капитализация";
 "market.global.volume_24h.title" = "Объем Торгов (24ч)";
 "market.global.defi_cap.title" = "Капитализация DeFi";
 "market.global.tvl_in_defi.title" = "TVL в DeFi";
@@ -505,25 +459,21 @@
 "coin_page.roi.day200" = "6 Месяцев";
 "coin_page.roi.year1" = "1 Год";
 
-"coin_page.tab.overview" = "Обзор";
-"coin_page.tab.markets" = "Рынок";
-"coin_page.tab.details" = "Детали";
+"coin_page.tab.overview" = "Цена";
+"coin_page.tab.markets" = "Рынки";
+"coin_page.tab.details" = "Аналитика";
 "coin_page.tab.tweets" = "Твиты";
 
 "coin_page.market_cap" = "Рын. Капитализация";
 "coin_page.circulating_supply" = "В обороте";
 "coin_page.total_supply" = "Макс.Выпуск";
-"coin_page.dilluted_market_cap" = "Разводненная рын.кап.";
+"coin_page.diluted_market_cap" = "Разводненная рын.кап.";
 "coin_page.genesis_date" = "Дата Старта";
 
 "coin_page.trading_volume" = "Объем Торговли";
 "coin_page.trading_volume.description" = "Историческое изменение усредненного ежедневного объема торговли для %@";
 "coin_page.markets" = "Рынки";
-
-"coin_page.coin_markets" = "%@ Рынки";
-"coin_page.coin_markets.sort_by" = "Сортировать По";
-"coin_page.coin_markets.sort_by.highest_volume" = "Наивысшему Обьему";
-"coin_page.coin_markets.sort_by.lowest_volume" = "Наименьшему Объему";
+"coin_page.markets.empty" = "Данные отсутствуют";
 
 "coin_page.token_liquidity" = "Ликвидность Токена";
 "coin_page.token_distribution" = "Распределение Токенов";
@@ -538,15 +488,15 @@
 
 "coin_page.investor_data" = "Данные Инвестора";
 
-"coin_page.treasuries" = "Казначейские ценные бумаги";
+"coin_page.treasuries" = "Treasuries";
 "coin_page.treasuries.filters" = "Фильтры";
 "coin_page.treasuries.filter.all" = "Все";
 "coin_page.treasuries.filter.public" = "В открытом доступе";
 "coin_page.treasuries.filter.private" = "В закрытом доступе";
 "coin_page.treasuries.filter.etf" = "ETF";
 
-"coin_page.funds_invested" = "Funds Invested";
-"coin_page.funds_invested.lead" = "Лид";
+"coin_page.funds_invested" = "Вложенные Средства";
+"coin_page.funds_invested.lead" = "Лиды";
 
 "coin_page.reports" = "Отчёты";
 
@@ -557,17 +507,17 @@
 
 "coin_page.guide" = "Руководство";
 "coin_page.website" = "Веб-сайт";
-"coin_page.whitepaper" = "Белая бумага";
+"coin_page.whitepaper" = "Whitepaper";
 
 "coin_page.favorited" = "Добавлено в Избранное";
 "coin_page.unfavorited" = "Удалить из Избранного";
 "coin_page.added_to_wallet" = "Добавлено в Кошелек";
 "coin_page.already_added_to_wallet" = "Уже добавлено в кошелек";
 
-"coin_page.major_holders" = "Основные Владельцы";
-"coin_page.major_holders.chart.description" = "Топ-10 лучших кошельков Ethereum";
-"coin_page.major_holders.top_ethereum_wallets" = "Лучшие кошельки Ethereum";
-"coin_page.major_holders.description" = "На графике выше показано % всех жетонов, находящихся в обороте топ-10 кошельков. Чем ниже это процентное соотношение, тем выше распределение коина.";
+"coin_page.major_holders" = "Крупные Держатели";
+"coin_page.major_holders.chart.description" = "Топ-10 кошельков Ethereum";
+"coin_page.major_holders.top_ethereum_wallets" = "Лучшие Кошельки Ethereum";
+"coin_page.major_holders.description" = "На графике выше показано % всех токенов, находящихся в обороте топ-10 кошельков. Чем ниже это процентное соотношение, тем выше распределение коина.";
 
 
 "coin_page.tvl_rank.multi_chain" = "Мультичейн";
@@ -637,14 +587,17 @@
 "transactions.yesterday" = "Вчера";
 
 "transactions.types.all" = "Все";
-"transactions.types.incoming" = "Входящие";
-"transactions.types.outgoing" = "Исходящие";
-"transactions.types.swap" = "Обмен";
-"transactions.types.approve" = "Подтверждение";
+"transactions.types.incoming" = "Получено";
+"transactions.types.outgoing" = "Отправлено";
+"transactions.types.swap" = "Обмены";
+"transactions.types.approve" = "Разрешения";
+
+"transactions.unknown_transaction.title" = "Неизвестная Транзакция";
+"transactions.unknown_transaction.description" = "Не удалось выполнить парсинг транзакции.";
 
 // Transaction Info
 
-"tx_info.title" = "Информация о Транзакции";
+"tx_info.title" = "Детали Транзакции";
 "tx_info.date" = "Дата";
 "tx_info.title_approval" = "Разрешение Обмена";
 "tx_info.status.pending" = "В обработке";
@@ -655,7 +608,7 @@
 "tx_info.to_hash" = "Кому";
 "tx_info.button_explorer" = "Посмотреть на %@";
 "tx_info.rate" = "Исторический Курс";
-"tx_info.options.speed_up" = "Ускорение";
+"tx_info.options.speed_up" = "Ускорить";
 "tx_info.options.cancel" = "Отменить";
 "tx_info.transaction.already_in_block" = "Транзакция уже в блоке";
 "tx_info.fee" = "Комиссия";
@@ -702,6 +655,7 @@
 
 "manage_wallets.title" = "Токены";
 "manage_wallets.not_found" = "Ничего не найдено. Попробуйте добавить токен вручную, если вы знаете его адрес смарт-контракта.";
+"manage_wallets.search_placeholder" = "Код или название токена";
 
 "manage_coins.add_coin.title" = "Добавить %@";
 "manage_coins.add_coin.subtitle" = "%@ Кошелек";
@@ -802,11 +756,13 @@
 "settings_manage_keys.delete.title" = "Удалить Кошелек";
 "settings_manage_keys.delete.confirmation_remove" = "Действие удалит этот кошелек с устройства.";
 "settings_manage_keys.delete.confirmation_loose" = "Если вы не сделали резервную копию приватного ключа для этого кошелька, вы потеряете доступ к вашим средствам.";
+"settings_manage_keys.delete.confirmation_watch" = "Вы точно хотите удалить этот кошелёк?";
 
 // Settings -> About App
 
 "settings.about_app.title" = "О приложении";
 "settings.about_app.app_name" = "Unstoppable Кошелек";
+"settings.about_app.whats_new" = "Что Нового";
 "settings.about_app.website" = "Веб-сайт";
 "settings.about_app.contact" = "Kонтакты";
 "settings.about_app.rate_us" = "Оцените наше приложение";
@@ -856,7 +812,7 @@
 "chart.time_duration.week2" = "2Н";
 "chart.time_duration.month" = "1М";
 "chart.time_duration.month3" = "3М";
-"chart.time_duration.halyear" = "6М";
+"chart.time_duration.halfyear" = "6М";
 "chart.time_duration.year" = "1Г";
 "chart.time_duration.year2" = "2Г";
 
@@ -903,8 +859,7 @@
 
 // Restore Select
 
-"restore_select.title" = "Выберите Токены";
-"restore_select.not_found" = "Не найдено";
+"restore_select.title" = "Выбрать Блокчейны";
 
 // Lock Info
 
@@ -925,10 +880,8 @@
 
 // Intro
 
-"intro.next" = "Далее";
-"intro.start" = "Начать";
-"intro.brand.description" = "Двигайтесь вперед!";
-"intro.unchain_assets.title" = "Освободите Активы";
+"intro.start" = "Be Unstoppable";
+"intro.unchain_assets.title" = "Освободите активы";
 "intro.unchain_assets.description" = "Распоряжайтесь активами свободно и без ограничений";
 "intro.go_borderless.title" = "Избавьтесь от Границ";
 "intro.go_borderless.description" = "Преодолейте барьеры и получите доступ к рынкам";
@@ -951,17 +904,21 @@
 "add_token.invalid_contract_address_or_bep2_symbol" = "Неверный адрес контракта или символ BEP2";
 "add_token.token_not_found" = "Токен не найден";
 "add_token.success_add" = "Добавлен";
+"add_token.input_placeholder" = "Адрес Контракта";
 
 // Wallet Connect
 
 "wallet_connect.title" = "Wallet Connect";
 "wallet_connect.error.invalid_url" = "Неверный URL-адрес";
 "wallet_connect.url" = "URL";
+"wallet_connect.active_account" = "Активный Кошелек";
+"wallet_connect.main.unsupported_chains" = "Нет поддерживаемых блокчейнов!";
 "wallet_connect.connect_description" = "Нажимая \"Подтвердить\", вы разрешаете этому приложению просматривать ваш общедоступный адрес. Это важный шаг для защиты ваших данных от потенциальных рисков фишинга.";
 "wallet_connect.usage_description" = "Вы можете перейти в браузер. Не закрывайте эту страницу во время использования браузера.";
 "wallet_connect.no_connection" = "Не удалось установить соединение. Попробуйте переподключиться снова.";
 "wallet_connect.button_reconnect" = "Повторное подключение";
 "wallet_connect.button_disconnect" = "Отсоединить";
+"ethereum_transaction.error.title" = "Ошибка";
 "ethereum_transaction.error.insufficient_balance" = "Для отправки транзакции требуется %@.";
 "ethereum_transaction.error.insufficient_balance_with_fee" = "Текущий баланс %@ ниже суммы, необходимой для обработки этой транзакции, включая комиссию за транзакцию.";
 "ethereum_transaction.error.lower_than_base_gas_limit" = "Выбранное значение комиссии слишком низкое и будет отклонено!";
@@ -970,13 +927,28 @@
 "wallet_connect.button.confirm" = "Подтвердить";
 "wallet_connect.sign.request_title" = "Запрос на подпись";
 "wallet_connect.sign.domain" = "Домен";
+"wallet_connect.sign.dapp_name" = "dApp";
 "wallet_connect.sign.message" = "Сообщение для подписи";
 "wallet_connect.sign.description" = "Пожалуйста, подпишите сообщение для аутентификации";
 
 "wallet_connect_list.title" = "Wallet Connect";
-"wallet_connect_list.new_connection" = "Новое Подключение";
-"wallet_connect_list.disconnecting" = "Отсоединяет...";
+"wallet_connect.list.empty_view_text" = "Нет активных сессий";
+"wallet_connect.list.empty_view_button_text" = "Новое Подключение";
 
+"wallet_connect.list.pending_requests" = "Отложенные Запросы";
+"wallet_connect.list.version_text" = "Версия %@";
+"wallet_connect.list.v1_bottom_text" = "В первой версии WalletConnect вы должны войти в сессии, чтобы увидеть и подтвердить запрос.";
+"wallet_connect_list.new_connection" = "Новое Подключение";
+"wallet_connect_list.disconnecting" = "Отсоединение";
+
+"wallet_connect.no_account.description" = "Нет подходящего кошелька. Вам нужно создать или восстановить текущий кошелек.";
+"wallet_connect.no_account.i_understand" = "Я Понимаю";
+
+"wallet_connect.watch_account.description" = "Эта функция не доступна для кошельков для просмотра, вам нужно выбрать восстановленный или созданный кошелек.";
+"wallet_connect.watch_account.switch" = "Перекл.";
+
+"wallet_connect.pending_requests_title" = "Отложенные Запросы";
+"wallet_connect.pending_requests.nonactive_footer" = "Чтобы открыть запрос, необходимо активировать желаемый кошелек";
 
 // App Status
 
@@ -994,28 +966,20 @@
 
 "status_info.title" = "Статус";
 "status_info.pending.title" = "В обработке";
-"status_info.pending.content" = "Транзакция еще не подтверждена в блокчейне. Транзакции, отправленные с рекомендованной или более высокой комиссией, обычно обрабатываются в течение 10 минут. Транзакции, отправленные с низкой комиссией, могут обрабатываться в течение нескольких часов или дней и даже отклоняться.";
+"status_info.pending.content" = "Транзакция еще не подтверждена в блокчейне. Транзакции, отправленные с рекомендованной или более высокой комиссией, обычно обрабатываются в течение  минут. Транзакции, отправленные с низкой комиссией, могут обрабатываться в течение нескольких часов или дней и даже отклоняться. Учтите, что обновление статуса каждой транзакции, отображаемого в интерфейсе кошелька Unstoppable, обычно происходит с небольшой задержкой. ";
 "status_info.processing.title" = "В Процессе";
 "status_info.processing.content" = "Транзакция уже включена в блокчейн, но пока не обработана. На данном этапе транзакции считаются завершенными для небольших платежей. Что касается завершения обработки более крупных транзакций, стоит дождаться смены статуса.";
 "status_info.completed.title" = "Завершено";
 "status_info.confirmed.content" = "Транзакция завершена и считается постоянной и необратимой.";
 "status_info.failed.title" = "Не удалось";
-"status_info.failed.content" = "Транзакция не была обработана, и передача заданной суммы не произошла. Транзакции со статусом отказа также записываются в блокчейн и за них взимаются комиссии. Приложение Unstoppable не может показать причину ошибочной обработки таких транзакций, но пользователи могут найти эту информацию на сайте block explorer, т.e. etherscan.io.";
-
-// Enable Coins
-
-"enable_coins.title" = "Активировать Монеты";
-"enable_coins.description" = "Активировать все %@ монеты с любым балансом.";
-"enable_coins.enable_button" = "Активировать";
-"enable_coins.enabling" = "Идет активация...";
-"enable_coins.enabled_coins" = "Включено ещё %@ монет";
-"enable_coins.enabled_no_coins" = "На балансе нет монет";
+"status_info.failed.content" = "Транзакция не была обработана и передача средств не произошла. В зависимости от причины неудачи, некоторые неудачные транзакции могут использовать комиссию за транзакцию. Транзакции, которые были заменены или отменены другой транзакцией, не потребляют транзакционные сборы и также будут показаны как \"не удалось\". Приложение Unstoppable не может показать причину неудачных транзакций, но пользователи могут посмотреть это в etherscan.io.";
 
 // Onboarding
 
-"onboarding.balance.description" = "У вас пока нет кошельков. Создайте новый или восстановите существующий";
+"onboarding.balance.description" = "Пока нет кошельков";
 "onboarding.balance.create" = "Создать";
 "onboarding.balance.restore" = "Восстановить";
+"onboarding.balance.watch" = "Посмотреть Адрес";
 "onboarding.balance.password_hint" = "Совет: восстановление существующего кошелька при помощи другой кодовой фразы приведет к созданию нового кошелька. Это очень удобно, когда вы хотите использовать одну мнемоническую восстановительную фразу длиной от 12 до 24 слов для нескольких кошельков.";
 
 // Manage Accounts
@@ -1044,5 +1008,67 @@
 
 // EVM Network
 
-"evm_network.switches_automatically" = "switches automatically";
-"evm_network.description" = "MainNet HTTP provider uses a number of sources (listed below) and switches between them automatically.";
+"evm_network.switches_automatically" = "переходит автоматически";
+"evm_network.description" = "Провайдер MainNet использует ряд приведенных ниже источников и автоматически переключается между ними.";
+
+// Fee Settings
+
+"fee_settings" = "Настройки Комиссии";
+"fee_settings.max_fee" = "Макс. Комиссия";
+"fee_settings.max_fee.info" = "Максимальная ожидаемая общая комиссия за данную транзакцию. Обычно, фактическая комиссия будет меньше.";
+"fee_settings.gas_limit" = "Gas Limit";
+"fee_settings.gas_limit.info" = "Gas Limit  - это максимальное количество единиц газа, которое пользователь готов потратить при отправке конкретной транзакции. Для выполнения более комплексных транзакций требуется большее количество единиц газ, чем для выполнения более простых. Лимит газа автоматически рассчитывается и задается для каждой транзакции.";
+"fee_settings.gas_price" = "Gas Price";
+"fee_settings.gas_price.info" = "Комиссия за сетевую транзакцию измеряется в единицах газа. Цена газа – это сумма, которую пользователь готов заплатить за единицу газа. Когда сеть занята, цены на газ повышаются, а во время простоя они наоборот снижаются. Слишком низкая цена газа зачастую является основанием для длительного сохранения отложенного статуса транзакции.";
+"fee_settings.current_base_fee" = "Текущая Базовая Комиссия";
+"fee_settings.base_fee" = "Макс. Базовая Комиссия";
+"fee_settings.base_fee.info" = "Пользователь должен потратить определенное количество единиц газа на обработку каждой транзакции в Ethereum. Стоимость одной единицы газа изменяется в реальном времени в зависимости от статуса сети и не контролируется ни одной организацией. Максимальный размер базовой комиссии в сочетании с опциональными майнерскими чаевыми (см. ниже) - это самая высокая цена за единицу газа, которую пользователь готов оплатить за отправку транзакции.";
+"fee_settings.tips" = "Оплата Майнерам";
+"fee_settings.tips.info" = "Плата майнерам (\"miner fee\") или так называемые \"майнерские чаевые\" - это дополнительная сумма, которую пользователи могут отправлять участникам сети, чтобы мотивировать их на приоритизацию своих транзакций.";
+"fee_settings.errors.insufficient_balance" = "Недостаточный баланс";
+"fee_settings.errors.insufficient_balance.info" = "Текущий баланс %@ ниже суммы, необходимой для обработки этой транзакции, включая комиссию за транзакцию.";
+"fee_settings.errors.low_max_fee" = "Низкая Комиссия";
+"fee_settings.errors.low_max_fee.info" = "Установленная сумма комиссии недостаточно для обработки этой транзакции.";
+"fee_settings.warning.risk_of_getting_stuck" = "Риски";
+"fee_settings.warning.risk_of_getting_stuck.info" = "Обработка транзакции может отложиться на некоторое время, или транзакцию могут полностью отклонить.";
+"fee_settings.warning.overpricing" = "Слишком Высокая Комиссия";
+"fee_settings.warning.overpricing.info" = "Установленная комиссия за транзакцию больше чем требуется для обработки этой транзакции.";
+
+// Watch Address
+
+"watch_address.title" = "Адрес";
+"watch_address.watch" = "Смотреть";
+
+// Nft Collections
+
+"nft_collections.title" = "NFT";
+"nft_collections.last_sale" = "Последняя продажа";
+"nft_collections.average_7d" = "Средн. 7Д";
+"nft_collections.average_30d" = "Средн. 30Д";
+"nft_collections.on_sale" = "В продаже";
+
+// Nft Asset
+
+"nft_asset.last_sale" = "Последняя Продажа";
+"nft_asset.average_7d" = "Среднее за 7 дней";
+"nft_asset.average_30d" = "Среднее за 30 дней";
+"nft_asset.floor_price" = "Минимальная Цена";
+"nft_asset.on_sale" = "В Продаже";
+"nft_asset.until_date" = "до %@";
+"nft_asset.buy_now" = "Купить Сейчас";
+"nft_asset.top_bid" = "Макс. Cтавка";
+"nft_asset.minimum_bid" = "Мин. Ставка";
+"nft_asset.best_offer" = "Лучшее Предложение";
+"nft_asset.properties" = "Параметры";
+"nft_asset.description" = "Описание";
+"nft_asset.details" = "Подробности";
+"nft_asset.details.contract_address" = "Адрес Контракта";
+"nft_asset.details.token_id" = "ID токена";
+"nft_asset.details.token_standard" = "Стандарт Токена";
+"nft_asset.details.blockchain" = "Блокчейн";
+"nft_asset.links" = "Ссылки";
+"nft_asset.links.website" = "Веб-сайт";
+"nft_asset.options.save_to_photos" = "Сохранить в Фото";
+"nft_asset.options.set_as_watch_face" = "Установить как Watch Face";
+"nft_asset.save_to_photos.success" = "NFT-изображение сохранено в ваш фотоальбом";
+"nft_asset.save_to_photos.failed" = "Не удалось сохранить NFT-изображение";

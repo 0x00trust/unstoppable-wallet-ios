@@ -2,20 +2,21 @@ import BitcoinCore
 import RxSwift
 import RxRelay
 import EthereumKit
+import MarketKit
 
 class AdapterFactory {
     private let appConfigProvider: AppConfigProvider
-    private let ethereumKitManager: EvmKitManager
-    private let binanceSmartChainKitManager: EvmKitManager
+    private let evmBlockchainManager: EvmBlockchainManager
+    private let evmSyncSourceManager: EvmSyncSourceManager
     private let binanceKitManager: BinanceKitManager
     private let initialSyncSettingsManager: InitialSyncSettingsManager
     private let restoreSettingsManager: RestoreSettingsManager
     private let coinManager: CoinManager
 
-    init(appConfigProvider: AppConfigProvider, ethereumKitManager: EvmKitManager, binanceSmartChainKitManager: EvmKitManager, binanceKitManager: BinanceKitManager, initialSyncSettingsManager: InitialSyncSettingsManager, restoreSettingsManager: RestoreSettingsManager, coinManager: CoinManager) {
+    init(appConfigProvider: AppConfigProvider, evmBlockchainManager: EvmBlockchainManager, evmSyncSourceManager: EvmSyncSourceManager, binanceKitManager: BinanceKitManager, initialSyncSettingsManager: InitialSyncSettingsManager, restoreSettingsManager: RestoreSettingsManager, coinManager: CoinManager) {
         self.appConfigProvider = appConfigProvider
-        self.ethereumKitManager = ethereumKitManager
-        self.binanceSmartChainKitManager = binanceSmartChainKitManager
+        self.evmBlockchainManager = evmBlockchainManager
+        self.evmSyncSourceManager = evmSyncSourceManager
         self.binanceKitManager = binanceKitManager
         self.initialSyncSettingsManager = initialSyncSettingsManager
         self.restoreSettingsManager = restoreSettingsManager
@@ -26,23 +27,40 @@ class AdapterFactory {
         initialSyncSettingsManager.setting(coinType: wallet.coinType, accountOrigin: wallet.account.origin)?.syncMode ?? .fast
     }
 
+    private func evmAdapter(wallet: Wallet) -> IAdapter? {
+        guard let blockchain = evmBlockchainManager.blockchain(coinType: wallet.coinType) else {
+            return nil
+        }
+        guard let evmKitWrapper = try? evmBlockchainManager.evmKitManager(blockchain: blockchain).evmKitWrapper(account: wallet.account, blockchain: blockchain) else {
+            return nil
+        }
+
+        return EvmAdapter(evmKitWrapper: evmKitWrapper)
+    }
+
+    private func evm20Adapter(address: String, wallet: Wallet, coinManager: CoinManager) -> IAdapter? {
+        guard let blockchain = evmBlockchainManager.blockchain(coinType: wallet.coinType) else {
+            return nil
+        }
+        guard let evmKitWrapper = try? evmBlockchainManager.evmKitManager(blockchain: blockchain).evmKitWrapper(account: wallet.account, blockchain: blockchain) else {
+            return nil
+        }
+        guard let baseCoin = evmBlockchainManager.basePlatformCoin(blockchain: blockchain) else {
+            return nil
+        }
+
+        return try? Evm20Adapter(evmKitWrapper: evmKitWrapper, contractAddress: address, wallet: wallet, baseCoin: baseCoin, coinManager: coinManager)
+    }
+
 }
 
 extension AdapterFactory {
 
-    func ethereumTransactionsAdapter(transactionSource: TransactionSource) -> ITransactionsAdapter? {
-        if let evmKit = try? ethereumKitManager.evmKit(account: transactionSource.account),
-           let baseCoin = try? coinManager.platformCoin(coinType: .ethereum) {
-            return EvmTransactionsAdapter(evmKit: evmKit, source: transactionSource, baseCoin: baseCoin, coinManager: coinManager)
-        }
-
-        return nil
-    }
-
-    func bscTransactionsAdapter(transactionSource: TransactionSource) -> ITransactionsAdapter? {
-        if let evmKit = try? binanceSmartChainKitManager.evmKit(account: transactionSource.account),
-           let baseCoin = try? coinManager.platformCoin(coinType: .binanceSmartChain) {
-            return EvmTransactionsAdapter(evmKit: evmKit, source: transactionSource, baseCoin: baseCoin, coinManager: coinManager)
+    func evmTransactionsAdapter(transactionSource: TransactionSource, blockchain: EvmBlockchain) -> ITransactionsAdapter? {
+        if let evmKitWrapper = try? evmBlockchainManager.evmKitManager(blockchain: blockchain).evmKitWrapper(account: transactionSource.account, blockchain: blockchain),
+           let baseCoin = evmBlockchainManager.basePlatformCoin(blockchain: blockchain) {
+            let syncSource = evmSyncSourceManager.syncSource(account: transactionSource.account, blockchain: blockchain)
+            return EvmTransactionsAdapter(evmKitWrapper: evmKitWrapper, source: transactionSource, baseCoin: baseCoin, evmTransactionSource: syncSource.transactionSource, coinManager: coinManager)
         }
 
         return nil
@@ -65,24 +83,14 @@ extension AdapterFactory {
             if let binanceKit = try? binanceKitManager.binanceKit(account: wallet.account), let feePlatformCoin = try? coinManager.platformCoin(coinType: .bep2(symbol: "BNB")) {
                 return BinanceAdapter(binanceKit: binanceKit, symbol: symbol, feeCoin: feePlatformCoin, wallet: wallet)
             }
-        case .ethereum:
-            if let evmKit = try? ethereumKitManager.evmKit(account: wallet.account) {
-                return EvmAdapter(evmKit: evmKit)
-            }
+        case .ethereum, .binanceSmartChain, .polygon:
+            return evmAdapter(wallet: wallet)
         case let .erc20(address):
-            if let evmKit = try? ethereumKitManager.evmKit(account: wallet.account),
-               let baseCoin = try? coinManager.platformCoin(coinType: .ethereum) {
-                return try? Evm20Adapter(evmKit: evmKit, contractAddress: address, wallet: wallet, baseCoin: baseCoin, coinManager: coinManager)
-            }
-        case .binanceSmartChain:
-            if let evmKit = try? binanceSmartChainKitManager.evmKit(account: wallet.account) {
-                return EvmAdapter(evmKit: evmKit)
-            }
+            return evm20Adapter(address: address, wallet: wallet, coinManager: coinManager)
         case let .bep20(address):
-            if let evmKit = try? binanceSmartChainKitManager.evmKit(account: wallet.account),
-               let baseCoin = try? coinManager.platformCoin(coinType: .binanceSmartChain) {
-                return try? Evm20Adapter(evmKit: evmKit, contractAddress: address, wallet: wallet, baseCoin: baseCoin, coinManager: coinManager)
-            }
+            return evm20Adapter(address: address, wallet: wallet, coinManager: coinManager)
+        case let .mrc20(address):
+            return evm20Adapter(address: address, wallet: wallet, coinManager: coinManager)
         default: ()
         }
 

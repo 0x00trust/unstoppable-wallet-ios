@@ -2,7 +2,8 @@ import RxSwift
 import RxCocoa
 
 protocol IRecipientAddressService {
-    var initialAddress: Address? { get }
+    var addressState: AddressService.State { get }
+    var addressStateObservable: Observable<AddressService.State> { get }
     var recipientError: Error? { get }
     var recipientErrorObservable: Observable<Error?> { get }
     func set(address: Address?)
@@ -10,107 +11,102 @@ protocol IRecipientAddressService {
 }
 
 class RecipientAddressViewModel {
-    private let service: IRecipientAddressService
-    private let resolutionService: AddressResolutionService
-    private let addressParser: IAddressParser
     private let disposeBag = DisposeBag()
+    private let service: AddressService
+    private let handlerDelegate: IRecipientAddressService? // for legacy handlers
 
+    private let isSuccessRelay = BehaviorRelay<Bool>(value: false)
+    private let isLoadingRelay = BehaviorRelay<Bool>(value: false)
     private let cautionRelay = BehaviorRelay<Caution?>(value: nil)
-    private let setTextRelay = PublishRelay<String?>()
+    private let setTextRelay = BehaviorRelay<String?>(value: nil)
 
     private var editing = false
-    private var forceShowError = false
 
-    init(service: IRecipientAddressService, resolutionService: AddressResolutionService, addressParser: IAddressParser) {
+    init(service: AddressService, handlerDelegate: IRecipientAddressService?) {
         self.service = service
-        self.resolutionService = resolutionService
-        self.addressParser = addressParser
+        self.handlerDelegate = handlerDelegate
 
-        service.recipientErrorObservable
-                .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .userInitiated))
-                .subscribe(onNext: { [weak self] _ in
-                    self?.sync()
-                })
-                .disposed(by: disposeBag)
+        subscribe(disposeBag, service.stateObservable) { [weak self] state in
+            self?.sync(state: state)
+        }
 
-        resolutionService.resolveFinishedObservable
-                .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .userInitiated))
-                .subscribe(onNext: { [weak self] address in
-                    self?.forceShowError = true
-
-                    if let address = address {
-                        self?.service.set(address: address)
-                    } else {
-                        self?.sync()
-                    }
-                })
-                .disposed(by: disposeBag)
-
-        sync()
+        sync(state: service.state)
     }
 
-    private func sync() {
-        if (editing && !forceShowError) || resolutionService.isResolving {
+    private func sync(state: AddressService.State) {
+        switch state {
+        case .empty:
             cautionRelay.accept(nil)
-        } else {
-            cautionRelay.accept(service.recipientError.map { Caution(text: $0.smartDescription, type: .error) })
+            isSuccessRelay.accept(false)
+            isLoadingRelay.accept(false)
+
+            handlerDelegate?.set(address: nil)
+        case .loading:
+            cautionRelay.accept(nil)
+            isSuccessRelay.accept(false)
+            isLoadingRelay.accept(true)
+
+            handlerDelegate?.set(address: nil)
+        case .validationError:
+            cautionRelay.accept(editing ? nil : Caution(text: AddressService.AddressError.invalidAddress.smartDescription, type: .error))
+            isSuccessRelay.accept(false)
+            isLoadingRelay.accept(false)
+
+            handlerDelegate?.set(address: nil)
+        case .fetchError:
+            cautionRelay.accept(Caution(text: AddressService.AddressError.invalidAddress.smartDescription, type: .error))
+            isSuccessRelay.accept(false)
+            isLoadingRelay.accept(false)
+
+            handlerDelegate?.set(address: nil)
+        case .success(let address):
+            setTextRelay.accept(address.title)
+            cautionRelay.accept(nil)
+            isSuccessRelay.accept(true)
+            isLoadingRelay.accept(false)
+
+            handlerDelegate?.set(address: address)
         }
+
     }
 
 }
 
 extension RecipientAddressViewModel {
 
-    var initialValue: String? {
-        service.initialAddress?.title
+    var isSuccessDriver: Driver<Bool> {
+        isSuccessRelay.asDriver()
     }
 
     var isLoadingDriver: Driver<Bool> {
-        resolutionService.isResolvingObservable.asDriver(onErrorJustReturn: false)
+        isLoadingRelay.asDriver()
     }
 
     var cautionDriver: Driver<Caution?> {
         cautionRelay.asDriver()
     }
 
-    var setTextSignal: Signal<String?> {
-        setTextRelay.asSignal()
+    var setTextDriver: Driver<String?> {
+        setTextRelay.asDriver()
     }
 
     func onChange(text: String?) {
-        forceShowError = false
-
-        service.set(address: text.map { Address(raw: $0) })
-        resolutionService.set(text: text)
+        service.set(text: text ?? "")
     }
 
     func onFetch(text: String?) {
-        guard let text = text, !text.isEmpty else {
-            return
-        }
-
-        let addressData = addressParser.parse(paymentAddress: text)
-
-        setTextRelay.accept(addressData.address)
-        onChange(text: addressData.address)
-
-        if let amount = addressData.amount {
-            service.set(amount: Decimal(amount))
-        }
+        let text = service.handleFetched(text: text ?? "")
+        setTextRelay.accept(text)
     }
 
     func onChange(editing: Bool) {
-        if editing {
-            forceShowError = true
-        }
-
         self.editing = editing
-        sync()
+        sync(state: service.state)
     }
 
 }
 
-extension SwapSettingsModule.AddressError: LocalizedError {
+extension AddressService.AddressError: LocalizedError {
 
     var errorDescription: String? {
         switch self {

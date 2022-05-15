@@ -14,8 +14,9 @@ class ManageAccountsViewController: ThemeViewController {
 
     private let createCell = BaseSelectableThemeCell()
     private let restoreCell = BaseSelectableThemeCell()
+    private let watchCell = BaseSelectableThemeCell()
 
-    private var viewItems = [ManageAccountsViewModel.ViewItem]()
+    private var viewState = ManageAccountsViewModel.ViewState.empty
     private var isLoaded = false
 
     init(viewModel: ManageAccountsViewModel) {
@@ -51,7 +52,7 @@ class ManageAccountsViewController: ThemeViewController {
         tableView.registerHeaderFooter(forClass: BottomDescriptionHeaderFooterView.self)
 
         createCell.set(backgroundStyle: .lawrence, isFirst: true)
-        CellBuilder.build(cell: createCell, elements: [.image, .text])
+        CellBuilder.build(cell: createCell, elements: [.image20, .text])
         createCell.bind(index: 0, block: { (component: ImageComponent) in
             component.imageView.image = UIImage(named: "plus_20")?.withTintColor(.themeJacob)
         })
@@ -60,8 +61,8 @@ class ManageAccountsViewController: ThemeViewController {
             component.text = "onboarding.balance.create".localized
         })
 
-        restoreCell.set(backgroundStyle: .lawrence, isLast: true)
-        CellBuilder.build(cell: restoreCell, elements: [.image, .text])
+        restoreCell.set(backgroundStyle: .lawrence)
+        CellBuilder.build(cell: restoreCell, elements: [.image20, .text])
         restoreCell.bind(index: 0, block: { (component: ImageComponent) in
             component.imageView.image = UIImage(named: "download_20")?.withTintColor(.themeJacob)
         })
@@ -70,7 +71,17 @@ class ManageAccountsViewController: ThemeViewController {
             component.text = "onboarding.balance.restore".localized
         })
 
-        subscribe(disposeBag, viewModel.viewItemsDriver) { [weak self] in self?.sync(viewItems: $0) }
+        watchCell.set(backgroundStyle: .lawrence, isLast: true)
+        CellBuilder.build(cell: watchCell, elements: [.image20, .text])
+        watchCell.bind(index: 0, block: { (component: ImageComponent) in
+            component.imageView.image = UIImage(named: "eye_20")?.withTintColor(.themeJacob)
+        })
+        watchCell.bind(index: 1, block: { (component: TextComponent) in
+            component.set(style: .b3)
+            component.text = "onboarding.balance.watch".localized
+        })
+
+        subscribe(disposeBag, viewModel.viewStateDriver) { [weak self] in self?.sync(viewState: $0) }
         subscribe(disposeBag, viewModel.finishSignal) { [weak self] in self?.dismiss(animated: true) }
 
         tableView.buildSections()
@@ -96,6 +107,11 @@ class ManageAccountsViewController: ThemeViewController {
         present(viewController, animated: true)
     }
 
+    private func onTapWatch() {
+        let viewController = WatchAddressModule.viewController()
+        present(viewController, animated: true)
+    }
+
     private func onTapEdit(accountId: String) {
         guard let viewController = ManageAccountModule.viewController(accountId: accountId) else {
             return
@@ -104,8 +120,8 @@ class ManageAccountsViewController: ThemeViewController {
         navigationController?.pushViewController(viewController, animated: true)
     }
 
-    private func sync(viewItems: [ManageAccountsViewModel.ViewItem]) {
-        self.viewItems = viewItems
+    private func sync(viewState: ManageAccountsViewModel.ViewState) {
+        self.viewState = viewState
         reloadTable()
     }
 
@@ -123,11 +139,11 @@ extension ManageAccountsViewController: SectionsDataSource {
 
     private func row(viewItem: ManageAccountsViewModel.ViewItem, index: Int, isFirst: Bool, isLast: Bool) -> RowProtocol {
         CellBuilder.selectableRow(
-                elements: [.image, .multiText, .image, .margin0, .transparentIconButton, .margin4],
+                elements: [.image24, .multiText, viewItem.alert || viewItem.watchAccount ? .margin16 : .margin0, .image20, .margin0, .transparentIconButton, .margin4],
                 layoutMargins: UIEdgeInsets(top: 0, left: CellBuilder.defaultMargin, bottom: 0, right: .margin4),
                 tableView: tableView,
                 id: viewItem.accountId,
-                hash: "\(viewItem.title)-\(viewItem.selected)-\(viewItem.alert)-\(isFirst)-\(isLast)",
+                hash: "\(viewItem.title)-\(viewItem.selected)-\(viewItem.alert)-\(viewItem.watchAccount)-\(isFirst)-\(isLast)",
                 height: .heightDoubleLineCell,
                 autoDeselect: true,
                 bind: { [weak self] cell in
@@ -143,11 +159,17 @@ extension ManageAccountsViewController: SectionsDataSource {
 
                         component.title.text = viewItem.title
                         component.subtitle.text = viewItem.subtitle
+                        component.subtitle.lineBreakMode = .byTruncatingMiddle
                     })
 
                     cell.bind(index: 2, block: { (component: ImageComponent) in
-                        component.isHidden = !viewItem.alert
-                        component.imageView.image = UIImage(named: "warning_2_20")?.withTintColor(.themeLucian)
+                        component.isHidden = !viewItem.alert && !viewItem.watchAccount
+
+                        if viewItem.alert {
+                            component.imageView.image = UIImage(named: "warning_2_20")?.withTintColor(.themeLucian)
+                        } else if viewItem.watchAccount {
+                            component.imageView.image = UIImage(named: "eye_20")?.withTintColor(.themeGray)
+                        }
                     })
 
                     cell.bind(index: 3, block: { (component: TransparentIconButtonComponent) in
@@ -173,11 +195,18 @@ extension ManageAccountsViewController: SectionsDataSource {
 
         return [
             Section(
-                    id: "view-items",
+                    id: "regular-view-items",
                     headerState: .margin(height: .margin12),
-                    footerState: .margin(height: viewItems.isEmpty ? 0 : .margin32),
-                    rows: viewItems.enumerated().map { index, viewItem in
-                        row(viewItem: viewItem, index: index, isFirst: index == 0, isLast: index == viewItems.count - 1)
+                    footerState: .margin(height: viewState.regularViewItems.isEmpty ? 0 : .margin32),
+                    rows: viewState.regularViewItems.enumerated().map { index, viewItem in
+                        row(viewItem: viewItem, index: index, isFirst: index == 0, isLast: index == viewState.regularViewItems.count - 1)
+                    }
+            ),
+            Section(
+                    id: "watch-view-items",
+                    footerState: .margin(height: viewState.watchViewItems.isEmpty ? 0 : .margin32),
+                    rows: viewState.watchViewItems.enumerated().map { index, viewItem in
+                        row(viewItem: viewItem, index: index, isFirst: index == 0, isLast: index == viewState.watchViewItems.count - 1)
                     }
             ),
             Section(
@@ -200,6 +229,15 @@ extension ManageAccountsViewController: SectionsDataSource {
                                 autoDeselect: true,
                                 action: { [weak self] in
                                     self?.onTapRestore()
+                                }
+                        ),
+                        StaticRow(
+                                cell: watchCell,
+                                id: "watch",
+                                height: .heightCell48,
+                                autoDeselect: true,
+                                action: { [weak self] in
+                                    self?.onTapWatch()
                                 }
                         )
                     ]

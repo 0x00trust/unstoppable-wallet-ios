@@ -6,18 +6,18 @@ struct MarkdownModule {
         let provider = MarkdownPlainContentProvider(url: url, networkManager: App.shared.networkManager)
         let service = MarkdownService(provider: provider)
         let parser = MarkdownParser()
-        let viewModel = MarkdownViewModel(service: service, parser: parser)
+        let viewModel = MarkdownViewModel(service: service, parser: parser, parserConfig: AcademyMarkdownConfig.config)
 
         return MarkdownViewController(viewModel: viewModel, handleRelativeUrl: handleRelativeUrl)
     }
 
-    static func gitReleaseNotesMarkdownViewController(url: URL, closeHandler: (() -> ())?) -> UIViewController {
+    static func gitReleaseNotesMarkdownViewController(url: URL, presented: Bool, closeHandler: (() -> ())? = nil) -> UIViewController {
         let provider = MarkdownGitReleaseContentProvider(url: url, networkManager: App.shared.networkManager)
         let service = MarkdownService(provider: provider)
         let parser = MarkdownParser()
-        let viewModel = MarkdownViewModel(service: service, parser: parser)
+        let viewModel = MarkdownViewModel(service: service, parser: parser, parserConfig: ReleaseNotesMarkdownConfig.config)
 
-        return ReleaseNotesViewController(viewModel: viewModel, handleRelativeUrl: false, urlManager: UrlManager(inApp: false), closeHandler: closeHandler)
+        return ReleaseNotesViewController(viewModel: viewModel, handleRelativeUrl: false, urlManager: UrlManager(inApp: false), presented: presented, closeHandler: closeHandler)
     }
 
 }

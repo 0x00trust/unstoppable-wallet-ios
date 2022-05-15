@@ -27,8 +27,8 @@ protocol ILocalStorage: AnyObject {
     var rateAppLastRequestDate: Date? { get set }
     var zcashAlwaysPendingRewind: Bool { get set }
 
-    func defaultProvider(blockchain: SwapModule.Dex.Blockchain) -> SwapModule.Dex.Provider
-    func setDefaultProvider(blockchain: SwapModule.Dex.Blockchain, provider: SwapModule.Dex.Provider)
+    func defaultProvider(blockchain: EvmBlockchain) -> SwapModule.Dex.Provider
+    func setDefaultProvider(blockchain: EvmBlockchain, provider: SwapModule.Dex.Provider)
 }
 
 protocol ILogRecordManager {
@@ -98,7 +98,7 @@ protocol ISendDashAdapter {
 }
 
 protocol ISendEthereumAdapter {
-    var evmKit: EthereumKit.Kit { get }
+    var evmKitWrapper: EvmKitWrapper { get }
     var balanceData: BalanceData { get }
     func transactionData(amount: BigUInt, address: EthereumKit.Address) -> TransactionData
 }
@@ -157,11 +157,6 @@ protocol IBackupManager {
     var allBackedUp: Bool { get }
     var allBackedUpObservable: Observable<Bool> { get }
     func setAccountBackedUp(id: String)
-}
-
-protocol IBlurManager {
-    func willResignActive()
-    func didBecomeActive()
 }
 
 protocol ISystemInfoManager {
@@ -243,7 +238,7 @@ protocol ICurrentDateProvider {
     var currentDate: Date { get }
 }
 
-protocol IAddressParser {
+protocol IAddressUriParser {
     func parse(paymentAddress: String) -> AddressData
 }
 
@@ -291,6 +286,7 @@ protocol IAppStatusManager {
 protocol IAppVersionManager {
     func checkLatestVersion()
     var newVersionObservable: Observable<AppVersion?> { get }
+    var currentVersion: AppVersion { get }
 }
 
 protocol IRateAppManager {
@@ -333,10 +329,17 @@ protocol IPresentDelegate: AnyObject {
 }
 
 protocol IWalletConnectSessionStorage {
-    func sessions(accountId: String, chainIds: [Int]) -> [WalletConnectSession]
+    func sessions(accountId: String) -> [WalletConnectSession]
     func save(session: WalletConnectSession)
     func deleteSession(peerId: String)
     func deleteSessions(accountId: String)
+}
+
+protocol IWalletConnectV2SessionStorage {
+    func sessionsV2(accountId: String?) -> [WalletConnectV2Session]
+    func save(sessions: [WalletConnectV2Session])
+    func deleteSessionV2(topics: [String])
+    func deleteSessionsV2(accountId: String)
 }
 
 protocol IDeepLinkManager {
@@ -364,6 +367,13 @@ protocol ICustomTokenStorage {
     func save(customTokens: [CustomToken])
 }
 
-protocol IChartTypeStorage: AnyObject {
-    var chartType: ChartType? { get set }
+protocol IChartIntervalStorage: AnyObject {
+    var interval: HsTimePeriod? { get set }
 }
+
+protocol IEvmAccountSyncStateStorage {
+    func evmAccountSyncState(accountId: String, chainId: Int) -> EvmAccountSyncState?
+    func save(evmAccountSyncState: EvmAccountSyncState)
+}
+
+protocol Warning {}

@@ -18,6 +18,7 @@ class WalletViewController: ThemeViewController {
     private let refreshControl = UIRefreshControl()
 
     private let emptyView = UIView()
+    private let watchEmptyView = UIView()
 
     private var viewItems = [BalanceViewItem]()
     private var headerViewItem: WalletViewModel.HeaderViewItem?
@@ -47,6 +48,8 @@ class WalletViewController: ThemeViewController {
 
         navigationItem.leftBarButtonItem = UIBarButtonItem(image: UIImage(named: "switch_wallet_24"), style: .plain, target: self, action: #selector(onTapSwitchWallet))
         navigationItem.leftBarButtonItem?.tintColor = .themeJacob
+
+        navigationItem.rightBarButtonItem = UIBarButtonItem(image: UIImage(named: "nft_24"), style: .plain, target: self, action: #selector(onTapNft))
 
         refreshControl.tintColor = .themeLeah
         refreshControl.alpha = 0.6
@@ -97,6 +100,23 @@ class WalletViewController: ThemeViewController {
         addCoinButton.setTitle("balance.empty.add_coins".localized, for: .normal)
         addCoinButton.addTarget(self, action: #selector(onTapAddCoin), for: .touchUpInside)
 
+        view.addSubview(watchEmptyView)
+        watchEmptyView.snp.makeConstraints { maker in
+            maker.leading.trailing.equalToSuperview()
+            maker.centerY.equalToSuperview()
+        }
+
+        let watchCautionView = CircleCautionView()
+
+        watchEmptyView.addSubview(watchCautionView)
+        watchCautionView.snp.makeConstraints { maker in
+            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin48)
+            maker.top.bottom.equalToSuperview()
+        }
+
+        watchCautionView.image = UIImage(named: "empty_wallet_48")
+        watchCautionView.text = "balance.watch_empty.description".localized
+
         subscribe(disposeBag, viewModel.titleDriver) { [weak self] in self?.navigationItem.title = $0 }
         subscribe(disposeBag, viewModel.displayModeDriver) { [weak self] in self?.sync(displayMode: $0) }
         subscribe(disposeBag, viewModel.headerViewItemDriver) { [weak self] in self?.sync(headerViewItem: $0) }
@@ -141,6 +161,10 @@ class WalletViewController: ThemeViewController {
         present(ThemeNavigationController(rootViewController: viewController), animated: true)
     }
 
+    @objc private func onTapNft() {
+        navigationController?.pushViewController(NftCollectionsModule.viewController(), animated: true)
+    }
+
     @objc private func onTapAddCoin() {
         openManageWallets()
     }
@@ -148,6 +172,7 @@ class WalletViewController: ThemeViewController {
     private func sync(displayMode: WalletViewModel.DisplayMode) {
         tableView.isHidden = displayMode != .list
         emptyView.isHidden = displayMode != .empty
+        watchEmptyView.isHidden = displayMode != .watchEmpty
     }
 
     private func sync(headerViewItem: WalletViewModel.HeaderViewItem?) {
@@ -185,6 +210,7 @@ class WalletViewController: ThemeViewController {
 
         if changes.contains(where: {
             if case .insert = $0 { return true }
+            if case .delete = $0 { return true }
             return false
         }) {
             DispatchQueue.main.sync {
@@ -194,20 +220,14 @@ class WalletViewController: ThemeViewController {
             return
         }
 
-        var deletedIndexes = Set<Int>()
         var updateIndexes = Set<Int>()
 
         for change in changes {
             switch change {
-            case .delete(let delete):
-//                print("delete \(delete.item.wallet.coin.code) [\(delete.index)]")
-                deletedIndexes.insert(delete.index)
             case .move(let move):
-//                print("move \(move.item.wallet.coin.code) [\(move.fromIndex) -> \(move.toIndex)]")
                 updateIndexes.insert(move.fromIndex)
                 updateIndexes.insert(move.toIndex)
             case .replace(let replace):
-//                print("replace\n\(replace.oldItem)\n\(replace.newItem)\n[\(replace.index)]")
                 updateIndexes.insert(replace.index)
             default: ()
             }
@@ -218,11 +238,6 @@ class WalletViewController: ThemeViewController {
 
             UIView.animate(withDuration: animationDuration) {
                 self.tableView.beginUpdates()
-
-                if !deletedIndexes.isEmpty {
-                    self.tableView.deleteRows(at: deletedIndexes.map { IndexPath(row: $0, section: 0) }, with: .fade)
-                }
-
                 self.tableView.endUpdates()
             }
 
@@ -337,6 +352,24 @@ class WalletViewController: ThemeViewController {
         tableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .bottom, animated: true)
     }
 
+    private func handleRemove(indexPath: IndexPath) {
+        let index = indexPath.row
+
+        guard index < viewItems.count else {
+            return
+        }
+
+        let wallet = viewItems[index].wallet
+
+        viewItems.remove(at: index)
+
+        tableView.beginUpdates()
+        tableView.deleteRows(at: [indexPath], with: .fade)
+        tableView.endUpdates()
+
+        viewModel.onDisable(wallet: wallet)
+    }
+
 }
 
 extension WalletViewController: UITableViewDataSource {
@@ -390,10 +423,12 @@ extension WalletViewController: UITableViewDelegate {
     }
 
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-        let wallet = viewItems[indexPath.row].wallet
+        guard viewModel.swipeActionsEnabled else {
+            return nil
+        }
 
         let action = UIContextualAction(style: .normal, title: nil) { [weak self] _, _, completion in
-            self?.viewModel.onDisable(wallet: wallet)
+            self?.handleRemove(indexPath: indexPath)
             completion(true)
         }
 

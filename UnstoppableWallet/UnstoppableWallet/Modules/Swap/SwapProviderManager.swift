@@ -8,6 +8,7 @@ import OneInchKit
 
 class SwapProviderManager {
     private let localStorage: ILocalStorage
+    private let evmBlockchainManager: EvmBlockchainManager
 
     private let dataSourceUpdatedRelay = PublishRelay<()>()
     private(set) var dataSourceProvider: ISwapProvider? {
@@ -23,30 +24,24 @@ class SwapProviderManager {
         }
     }
 
-    init(localStorage: ILocalStorage, platformCoinFrom: PlatformCoin?) {
+    init(localStorage: ILocalStorage, evmBlockchainManager: EvmBlockchainManager, platformCoinFrom: PlatformCoin?) {
         self.localStorage = localStorage
+        self.evmBlockchainManager = evmBlockchainManager
 
         initSectionsDataSource(platformCoinFrom: platformCoinFrom)
     }
 
     private func initSectionsDataSource(platformCoinFrom: PlatformCoin?) {
-        let blockchain: SwapModule.Dex.Blockchain?
-        switch platformCoinFrom?.coinType {
-        case .ethereum, .erc20:
-            blockchain = .ethereum
-        case .binanceSmartChain, .bep20:
-            blockchain = .binanceSmartChain
-        case nil:
-            blockchain = .ethereum
-        default:
-            blockchain = nil
-            return
-        }
+        let blockchain: EvmBlockchain
 
-        guard let blockchain = blockchain else {
-            dex = nil
-            dataSourceProvider = nil
-            return
+        if let platformCoinFrom = platformCoinFrom {
+            if let evmBlockchain = evmBlockchainManager.blockchain(coinType: platformCoinFrom.coinType) {
+                blockchain = evmBlockchain
+            } else {
+                return
+            }
+        } else {
+            blockchain = .ethereum
         }
 
         let dexProvider = localStorage.defaultProvider(blockchain: blockchain)
@@ -60,7 +55,7 @@ class SwapProviderManager {
         let state = dataSourceProvider?.swapState ?? SwapModule.DataSourceState(platformCoinFrom: platformCoinFrom)
 
         switch dex.provider {
-        case .uniswap, .pancake:
+        case .uniswap, .pancake, .quickSwap:
             return UniswapModule(dex: dex, dataSourceState: state)
         case .oneInch:
             return OneInchModule(dex: dex, dataSourceState: state)

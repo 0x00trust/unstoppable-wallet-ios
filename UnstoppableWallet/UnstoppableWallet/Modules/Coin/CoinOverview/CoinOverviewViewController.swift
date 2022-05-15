@@ -88,7 +88,7 @@ class CoinOverviewViewController: ThemeViewController {
             .item(title: $0)
         })
         chartIntervalAndSelectedRateCell.onSelectInterval = { [weak self] index in
-            self?.chartViewModel.onSelectType(at: index)
+            self?.chartViewModel.onSelectInterval(at: index)
         }
 
         indicatorSelectorCell.onTapIndicator = { [weak self] indicator in
@@ -229,7 +229,7 @@ extension CoinOverviewViewController {
                 timeline: viewItem.timeline)
 
         guard let selectedIndicator = viewItem.selectedIndicator else {
-            chartViewCell.setVolumes(hidden: true, limitHidden: false)
+            chartViewCell.setVolumes(hidden: false, limitHidden: false)
             ChartIndicatorSet.all.forEach { indicator in
                 chartViewCell.bind(indicator: indicator, hidden: true)
             }
@@ -541,7 +541,7 @@ extension CoinOverviewViewController {
                 (id: "volume24", title: "coin_page.trading_volume".localized, badge: nil, text: $0)
             },
             viewItem.dilutedMarketCap.map {
-                (id: "dilluted_m_cap", title: "coin_page.dilluted_market_cap".localized, badge: nil, text: $0)
+                (id: "diluted_m_cap", title: "coin_page.diluted_market_cap".localized, badge: nil, text: $0)
             },
             viewItem.tvl.map {
                 (id: "tvl", title: "coin_page.tvl".localized, badge: nil, text: $0)

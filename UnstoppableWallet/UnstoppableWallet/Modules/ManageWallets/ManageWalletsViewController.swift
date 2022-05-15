@@ -28,7 +28,7 @@ class ManageWalletsViewController: CoinToggleViewController {
         super.viewDidLoad()
 
         title = "manage_wallets.title".localized
-        navigationItem.searchController?.searchBar.placeholder = "placeholder.search".localized
+        navigationItem.searchController?.searchBar.placeholder = "manage_wallets.search_placeholder".localized
 
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "button.done".localized, style: .done, target: self, action: #selector(onTapDoneButton))
         navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(onTapAddTokenButton))
@@ -50,7 +50,7 @@ class ManageWalletsViewController: CoinToggleViewController {
         }
 
         subscribe(disposeBag, viewModel.notFoundVisibleDriver) { [weak self] in self?.setNotFound(visible: $0) }
-        subscribe(disposeBag, viewModel.disableCoinSignal) { [weak self] in self?.setToggle(on: false, coin: $0) }
+        subscribe(disposeBag, viewModel.disableCoinSignal) { [weak self] in self?.setToggle(on: false, uid: $0.uid) }
     }
 
     private func open(controller: UIViewController) {

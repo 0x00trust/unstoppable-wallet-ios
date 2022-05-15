@@ -27,9 +27,9 @@ extension MarketGlobalFetcher: IMetricChartConfiguration {
 
 extension MarketGlobalFetcher: IMetricChartFetcher {
 
-    func fetchSingle(currencyCode: String, timePeriod: TimePeriod) -> RxSwift.Single<[MetricChartModule.Item]> {
+    func fetchSingle(currencyCode: String, interval: HsTimePeriod) -> RxSwift.Single<[MetricChartModule.Item]> {
         marketKit
-                .globalMarketPointsSingle(currencyCode: currencyCode, timePeriod: timePeriod)
+                .globalMarketPointsSingle(currencyCode: currencyCode, timePeriod: interval)
                 .map { [weak self] points in
                     let result = points.map { point -> MetricChartModule.Item in
                         let value: Decimal

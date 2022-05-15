@@ -53,7 +53,7 @@ class WalletViewModel {
     }
 
     private func sync(totalItem: WalletService.TotalItem?) {
-        let headerViewItem = totalItem.map { factory.headerViewItem(totalItem: $0, balanceHidden: service.balanceHidden) }
+        let headerViewItem = totalItem.map { factory.headerViewItem(totalItem: $0, balanceHidden: service.balanceHidden, watchAccount: service.watchAccount, watchAccountAddress: service.watchAccountAddress) }
         headerViewItemRelay.accept(headerViewItem)
     }
 
@@ -84,11 +84,11 @@ class WalletViewModel {
             self.viewItemsRelay.accept(self.viewItems)
         }
 
-        displayModeRelay.accept(items.isEmpty ? .empty : .list)
+        displayModeRelay.accept(items.isEmpty ? (service.watchAccount ? .watchEmpty : .empty) : .list)
     }
 
     private func viewItem(item: WalletService.Item) -> BalanceViewItem {
-        factory.viewItem(item: item, balanceHidden: service.balanceHidden, expanded: item.wallet == expandedWallet)
+        factory.viewItem(item: item, balanceHidden: service.balanceHidden, actionsHidden: service.watchAccount, expanded: item.wallet == expandedWallet)
     }
 
     private func syncViewItem(wallet: Wallet) {
@@ -164,6 +164,10 @@ extension WalletViewModel {
         }
     }
 
+    var swipeActionsEnabled: Bool {
+        !service.watchAccount
+    }
+
     func onSelectSortType(index: Int) {
         service.sortType = WalletModule.SortType.allCases[index]
     }
@@ -174,21 +178,25 @@ extension WalletViewModel {
     }
 
     func onTap(wallet: Wallet) {
-        queue.async {
-            if self.expandedWallet == wallet {
-                self.expandedWallet = nil
-                self.syncViewItem(wallet: wallet)
-            } else {
-                let oldExpandedWallet = self.expandedWallet
-                self.expandedWallet = wallet
+        if service.watchAccount {
+            onTapChart(wallet: wallet)
+        } else {
+            queue.async {
+                if self.expandedWallet == wallet {
+                    self.expandedWallet = nil
+                    self.syncViewItem(wallet: wallet)
+                } else {
+                    let oldExpandedWallet = self.expandedWallet
+                    self.expandedWallet = wallet
 
-                if let oldExpandedWallet = oldExpandedWallet {
-                    self.syncViewItem(wallet: oldExpandedWallet)
+                    if let oldExpandedWallet = oldExpandedWallet {
+                        self.syncViewItem(wallet: oldExpandedWallet)
+                    }
+                    self.syncViewItem(wallet: wallet)
                 }
-                self.syncViewItem(wallet: wallet)
-            }
 
-            self.viewItemsRelay.accept(self.viewItems)
+                self.viewItemsRelay.accept(self.viewItems)
+            }
         }
     }
 
@@ -251,11 +259,14 @@ extension WalletViewModel {
     enum DisplayMode {
         case list
         case empty
+        case watchEmpty
     }
 
     struct HeaderViewItem {
         let amount: String?
         let amountExpired: Bool
+        let manageWalletsHidden: Bool
+        let address: String?
     }
 
 }

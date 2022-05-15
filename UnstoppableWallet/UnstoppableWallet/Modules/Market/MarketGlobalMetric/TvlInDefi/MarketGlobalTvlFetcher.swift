@@ -41,9 +41,9 @@ extension MarketGlobalTvlFetcher: IMetricChartFetcher {
         needUpdateRelay.asObservable()
     }
 
-    func fetchSingle(currencyCode: String, timePeriod: TimePeriod) -> RxSwift.Single<[MetricChartModule.Item]> {
+    func fetchSingle(currencyCode: String, interval: HsTimePeriod) -> RxSwift.Single<[MetricChartModule.Item]> {
         marketKit
-                .marketInfoGlobalTvlSingle(platform: service.marketPlatformField.chain, currencyCode: currencyCode, timePeriod: timePeriod)
+                .marketInfoGlobalTvlSingle(platform: service.marketPlatformField.chain, currencyCode: currencyCode, timePeriod: interval)
                 .map { points in
                     points.map { point -> MetricChartModule.Item in
                         MetricChartModule.Item(value: point.value, timestamp: point.timestamp)

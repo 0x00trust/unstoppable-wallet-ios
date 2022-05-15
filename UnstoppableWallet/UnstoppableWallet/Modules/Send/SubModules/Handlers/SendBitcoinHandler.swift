@@ -12,11 +12,12 @@ class SendBitcoinHandler {
     private let feeModule: ISendFeeModule
     private let feePriorityModule: ISendFeePriorityModule
     private let hodlerModule: ISendHodlerModule?
+    private let bitcoinAddressParser: BitcoinAddressParserItem
 
     private var pluginData = [UInt8: IBitcoinPluginData]()
 
     init(interactor: ISendBitcoinInteractor, amountModule: ISendAmountModule, addressModule: ISendAddressModule,
-         feeModule: ISendFeeModule, feePriorityModule: ISendFeePriorityModule, hodlerModule: ISendHodlerModule?) {
+         feeModule: ISendFeeModule, feePriorityModule: ISendFeePriorityModule, hodlerModule: ISendHodlerModule?, bitcoinAddressParser: BitcoinAddressParserItem) {
         self.interactor = interactor
 
         self.amountModule = amountModule
@@ -24,6 +25,7 @@ class SendBitcoinHandler {
         self.feeModule = feeModule
         self.feePriorityModule = feePriorityModule
         self.hodlerModule = hodlerModule
+        self.bitcoinAddressParser = bitcoinAddressParser
     }
 
     private func syncValidation() {
@@ -37,7 +39,7 @@ class SendBitcoinHandler {
         }
 
         do {
-            try addressModule.validateAddress()
+            _ = try addressModule.validAddress()
         } catch {
             addressError = error
         }
@@ -167,10 +169,6 @@ extension SendBitcoinHandler: ISendAmountDelegate {
 
 extension SendBitcoinHandler: ISendAddressDelegate {
 
-    func validate(address: String) throws {
-        try interactor.validate(address: address, pluginData: pluginData)
-    }
-
     func onUpdateAddress() {
         syncMinimumAmount()
         syncState()
@@ -198,6 +196,8 @@ extension SendBitcoinHandler: ISendHodlerDelegate {
         }
 
         pluginData = hodlerModule.pluginData
+        bitcoinAddressParser.pluginData = pluginData
+
         syncValidation()
         syncMaximumAmount()
         syncState()

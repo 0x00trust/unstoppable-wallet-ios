@@ -1,6 +1,7 @@
 import UIKit
 import ThemeKit
 import ComponentKit
+import SectionsTableView
 
 class TitledHighlightedDescriptionCell: BaseThemeCell {
     private static let horizontalMargin: CGFloat = .margin16
@@ -37,6 +38,35 @@ class TitledHighlightedDescriptionCell: BaseThemeCell {
     var descriptionText: String? {
         get { descriptionView.text }
         set { descriptionView.text = newValue }
+    }
+
+    var contentBackgroundColor: UIColor? {
+        get { descriptionView.backgroundColor }
+        set { descriptionView.backgroundColor = newValue }
+    }
+
+    var contentBorderColor: UIColor? {
+        get { descriptionView.borderColor }
+        set { descriptionView.borderColor = newValue }
+    }
+
+    var titleColor: UIColor? {
+        get { descriptionView.titleColor }
+        set { descriptionView.titleColor = newValue }
+    }
+
+    func bind(caution: TitledCaution) {
+        titleIcon = UIImage(named: "warning_2_20")?.withRenderingMode(.alwaysTemplate)
+        tintColor = caution.type == .error ? .themeLucian : .themeJacob
+        titleText = caution.title
+        titleColor = caution.type == .error ? .themeLucian : .themeJacob
+        descriptionText = caution.text
+        contentBackgroundColor = caution.type == .error ? UIColor(hex: 0xff4820, alpha: 0.2) : .themeYellow20
+        contentBorderColor = caution.type == .error ? .themeLucian : .themeJacob
+    }
+
+    func cellHeight(containerWidth: CGFloat) -> CGFloat {
+        isVisible ? Self.height(containerWidth: containerWidth, text: descriptionText ?? "") : 0
     }
 
 }

@@ -33,17 +33,14 @@ class CoinSelectService {
     }
 
     private func dexSupports(platformCoin: PlatformCoin) -> Bool {
-        switch platformCoin.coinType {
-        case .ethereum, .erc20: return dex.blockchain == .ethereum
-        case .binanceSmartChain, .bep20: return dex.blockchain == .binanceSmartChain
-        default: return false
-        }
+        dex.blockchain.supports(coinType: platformCoin.coinType)
     }
 
     private func platformType() -> PlatformType {
         switch dex.blockchain {
         case .ethereum: return .ethereum
         case .binanceSmartChain: return .binanceSmartChain
+        case .polygon: return .polygon
         }
     }
 

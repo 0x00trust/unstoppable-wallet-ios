@@ -30,12 +30,12 @@ class SendDashHandler {
         }
 
         do {
-            try addressModule.validateAddress()
+            _ = try addressModule.validAddress()
         } catch {
             addressError = error
         }
 
-        delegate?.onChange(isValid: amountError == nil && addressError == nil, amountError: amountError, addressError: addressError)
+        delegate?.onChange(isValid: amountError == nil &&  addressError == nil, amountError: amountError, addressError: addressError)
     }
 
     private func syncAvailableBalance() {
@@ -120,10 +120,6 @@ extension SendDashHandler: ISendAmountDelegate {
 }
 
 extension SendDashHandler: ISendAddressDelegate {
-
-    func validate(address: String) throws {
-        try interactor.validate(address: address)
-    }
 
     func onUpdateAddress() {
         syncAvailableBalance()

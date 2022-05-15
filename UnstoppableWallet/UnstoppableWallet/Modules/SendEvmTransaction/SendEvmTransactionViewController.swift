@@ -10,33 +10,27 @@ class SendEvmTransactionViewController: ThemeViewController {
     let disposeBag = DisposeBag()
 
     let transactionViewModel: SendEvmTransactionViewModel
+    let feeViewModel: EvmFeeViewModel
 
     private let tableView = SectionsTableView(style: .grouped)
     let bottomWrapper = BottomGradientHolder()
 
-    private let estimatedFeeCell: SendFeeCell
-    private let maxFeeCell: SendFeeCell
-    private let feePriorityCell: SendFeePriorityCell
-    private let errorCell = SendEthereumErrorCell()
+    private let maxFeeCell: EditableFeeCell
 
     private var sectionViewItems = [SendEvmTransactionViewModel.SectionViewItem]()
+    private let caution1Cell = TitledHighlightedDescriptionCell()
+    private let caution2Cell = TitledHighlightedDescriptionCell()
     private var isLoaded = false
 
     var topDescription: String?
 
-    init(transactionViewModel: SendEvmTransactionViewModel, feeViewModel: EthereumFeeViewModel) {
+    init(transactionViewModel: SendEvmTransactionViewModel, feeViewModel: EvmFeeViewModel) {
         self.transactionViewModel = transactionViewModel
+        self.feeViewModel = feeViewModel
 
-        estimatedFeeCell = SendFeeCell(driver: feeViewModel.estimatedFeeDriver)
-        maxFeeCell = SendFeeCell(driver: feeViewModel.feeDriver)
-        feePriorityCell = SendFeePriorityCell(viewModel: feeViewModel)
+        maxFeeCell = EditableFeeCell(viewModel: feeViewModel)
 
         super.init()
-
-        feePriorityCell.delegate = self
-
-        estimatedFeeCell.titleType = .estimatedFee
-        subscribe(disposeBag, feeViewModel.estimatedFeeDriver) { [weak self] in self?.maxFeeCell.titleType = $0 == nil ? .fee : .maxFee }
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -54,7 +48,6 @@ class SendEvmTransactionViewController: ThemeViewController {
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
         tableView.delaysContentTouches = false
-        tableView.allowsSelection = false
 
         tableView.registerCell(forClass: B7Cell.self)
         tableView.registerCell(forClass: D7Cell.self)
@@ -72,7 +65,7 @@ class SendEvmTransactionViewController: ThemeViewController {
             maker.bottom.equalTo(view.safeAreaLayoutGuide)
         }
 
-        subscribe(disposeBag, transactionViewModel.errorDriver) { [weak self] in self?.handle(error: $0) }
+        subscribe(disposeBag, transactionViewModel.cautionsDriver) { [weak self] in self?.handle(cautions: $0) }
         subscribe(disposeBag, transactionViewModel.sendingSignal) { HudHelper.instance.showSpinner() }
         subscribe(disposeBag, transactionViewModel.sendSuccessSignal) { [weak self] in self?.handleSendSuccess(transactionHash: $0) }
         subscribe(disposeBag, transactionViewModel.sendFailedSignal) { [weak self] in self?.handleSendFailed(error: $0) }
@@ -87,8 +80,21 @@ class SendEvmTransactionViewController: ThemeViewController {
         isLoaded = true
     }
 
-    private func handle(error: String?) {
-        errorCell.bind(text: error)
+    private func handle(cautions: [TitledCaution]) {
+        if let caution = cautions.first {
+            caution1Cell.bind(caution: caution)
+            caution1Cell.isVisible = true
+        } else {
+            caution1Cell.isVisible = false
+        }
+
+        if cautions.count > 1 {
+            caution2Cell.bind(caution: cautions[1])
+            caution2Cell.isVisible = true
+        } else {
+            caution2Cell.isVisible = false
+        }
+
         reloadTable()
     }
 
@@ -96,6 +102,14 @@ class SendEvmTransactionViewController: ThemeViewController {
         HudHelper.instance.showSuccess(title: "alert.success_action".localized)
 
         dismiss(animated: true)
+    }
+
+    private func openFeeSettings() {
+        guard let controller = EvmFeeModule.viewController(feeViewModel: feeViewModel) else {
+            return
+        }
+
+        present(controller, animated: true)
     }
 
     private func handleSendFailed(error: String) {
@@ -185,26 +199,12 @@ class SendEvmTransactionViewController: ThemeViewController {
         )
     }
 
-    private func warningRow(title: String, value: String, index: Int, isFirst: Bool, isLast: Bool) -> RowProtocol {
-        Row<TitledHighlightedDescriptionCell>(
-                id: title,
-                dynamicHeight: { containerWidth in TitledHighlightedDescriptionCell.height(containerWidth: containerWidth, text: value) },
-                bind: { cell, _ in
-                    cell.titleIcon = UIImage(named: "warning_2_20")?.withRenderingMode(.alwaysTemplate)
-                    cell.tintColor = .themeJacob
-                    cell.titleText = title
-                    cell.descriptionText = value
-                }
-        )
-    }
-
     private func row(viewItem: SendEvmTransactionViewModel.ViewItem, index: Int, isFirst: Bool, isLast: Bool) -> RowProtocol {
         switch viewItem {
         case let .subhead(title, value): return subheadRow(title: title, value: value, index: index, isFirst: isFirst, isLast: isLast)
         case let .value(title, value, type): return valueRow(title: title, value: value, type: type, index: index, isFirst: isFirst, isLast: isLast)
         case let .address(title, valueTitle, value): return hexRow(title: title, valueTitle: valueTitle, value: value, index: index, isFirst: isFirst, isLast: isLast)
         case .input(let value): return hexRow(title: "Input", valueTitle: value, value: value, index: index, isFirst: isFirst, isLast: isLast)
-        case let .warning(title, value): return warningRow(title: title, value: value, index: index, isFirst: isFirst, isLast: isLast)
         }
     }
 
@@ -243,51 +243,47 @@ extension SendEvmTransactionViewController: SectionsDataSource {
                     headerState: .margin(height: .margin12),
                     rows: [
                         StaticRow(
-                                cell: estimatedFeeCell,
-                                id: "estimated-fee",
-                                height: estimatedFeeCell.cellHeight
-                        ),
-                        StaticRow(
                                 cell: maxFeeCell,
                                 id: "fee",
-                                height: maxFeeCell.cellHeight
-                        )
-                    ]
-            ),
-            Section(
-                    id: "fee-priority",
-                    headerState: .margin(height: 6),
-                    footerState: .margin(height: .margin32),
-                    rows: [
-                        StaticRow(
-                                cell: feePriorityCell,
-                                id: "fee-priority",
-                                height: feePriorityCell.cellHeight
-                        ),
-                        StaticRow(
-                                cell: errorCell,
-                                id: "error",
-                                dynamicHeight: { [weak self] width in
-                                    self?.errorCell.cellHeight(width: width) ?? 0
+                                height: .heightCell48,
+                                autoDeselect: true,
+                                action: { [weak self] in
+                                    self?.openFeeSettings()
                                 }
                         )
                     ]
             )
         ]
 
-        return transactionSections + feeSections
-    }
+        let cautionsSections: [SectionProtocol] = [
+            Section(
+                    id: "caution1",
+                    headerState: .margin(height: .margin12),
+                    rows: [
+                        StaticRow(
+                                cell: caution1Cell,
+                                id: "caution1",
+                                dynamicHeight: { [weak self] containerWidth in
+                                    self?.caution1Cell.cellHeight(containerWidth: containerWidth) ?? 0
+                                }
+                        )
+                    ]
+            ),
+            Section(
+                    id: "caution2",
+                    headerState: .margin(height: .margin12),
+                    rows: [
+                        StaticRow(
+                                cell: caution2Cell,
+                                id: "caution2",
+                                dynamicHeight: { [weak self] containerWidth in
+                                    self?.caution2Cell.cellHeight(containerWidth: containerWidth) ?? 0
+                                }
+                        )]
+            )
+        ]
 
-}
-
-extension SendEvmTransactionViewController: ISendFeePriorityCellDelegate {
-
-    func open(viewController: UIViewController) {
-        present(viewController, animated: true)
-    }
-
-    func onChangeHeight() {
-        reloadTable()
+        return transactionSections + feeSections + cautionsSections
     }
 
 }

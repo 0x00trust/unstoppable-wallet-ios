@@ -6,7 +6,14 @@ import StorageKit
 class SendEvmModule {
 
     static func viewController(platformCoin: PlatformCoin, adapter: ISendEthereumAdapter) -> UIViewController {
-        let service = SendEvmService(platformCoin: platformCoin, adapter: adapter)
+        let addressParserChain = AddressParserChain()
+        addressParserChain.append(handler: EvmAddressParser())
+
+        let addressUriParser = AddressParserFactory.parser(coinType: platformCoin.coinType)
+        let addressService = AddressService(addressUriParser: addressUriParser, addressParserChain: addressParserChain)
+
+        let service = SendEvmService(platformCoin: platformCoin, adapter: adapter, addressService: addressService)
+
         let switchService = AmountTypeSwitchService(localStorage: StorageKit.LocalStorage.default)
         let fiatService = FiatService(switchService: switchService, currencyKit: App.shared.currencyKit, marketKit: App.shared.marketKit)
 
@@ -24,21 +31,14 @@ class SendEvmModule {
                 decimalParser: AmountDecimalParser()
         )
 
-        let chainCoinCode = AddressResolutionService.chainCoinCode(coinType: platformCoin.platform.coinType) ?? platformCoin.code
-        let resolutionService = AddressResolutionService(
-                coinCode: chainCoinCode,
-                chain: nil
-        )
+        let chainCoinCode = UDNAddressParserItem.chainCoinCode(coinType: platformCoin.platform.coinType)
+        let chain = UDNAddressParserItem.chain(coinType: platformCoin.platform.coinType)
+        addressParserChain.append(handler: UDNAddressParserItem(coinCode: platformCoin.code, platformCoinCode: chainCoinCode, chain: chain))
 
-        let addressParserFactory = AddressParserFactory()
-        let recipientViewModel = RecipientAddressViewModel(
-                service: service,
-                resolutionService: resolutionService,
-                addressParser: addressParserFactory.parser(coinType: platformCoin.coinType)
-        )
+        let recipientViewModel = RecipientAddressViewModel(service: addressService, handlerDelegate: nil)
 
         let viewController = SendEvmViewController(
-                evmKit: adapter.evmKit,
+                evmKitWrapper: adapter.evmKitWrapper,
                 viewModel: viewModel,
                 availableBalanceViewModel: availableBalanceViewModel,
                 amountViewModel: amountViewModel,

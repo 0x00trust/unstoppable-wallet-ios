@@ -65,7 +65,7 @@ class UniswapViewModel {
         let filtered = errors.filter { error in
             switch error {
             case let error as UniswapKit.Kit.TradeError: return error != .zeroAmount
-            case _ as EvmTransactionService.GasDataError: return false
+            case _ as EvmFeeModule.GasDataError: return false
             case _ as SwapModule.SwapError: return false
             default: return true
             }
@@ -233,11 +233,15 @@ extension UniswapViewModel {
                 deadline: viewItemHelper.deadline(tradeService.settings.ttl),
                 recipientDomain: tradeService.settings.recipient?.domain,
                 price: viewItemHelper.priceValue(executionPrice: trade.tradeData.executionPrice, platformCoinIn: tradeService.platformCoinIn, platformCoinOut: tradeService.platformCoinOut)?.formattedString,
-                priceImpact: viewItemHelper.priceImpactViewItem(trade: trade),
-                warning: trade.impactLevel == .forbidden ? "swap.confirmation.impact_too_high".localized : nil
+                priceImpact: viewItemHelper.priceImpactViewItem(trade: trade)
         )
 
-        openConfirmRelay.accept(SendEvmData(transactionData: transactionData, additionalInfo: .uniswap(info: swapInfo)))
+        let sendEvmData = SendEvmData(
+                transactionData: transactionData, additionalInfo: .uniswap(info: swapInfo),
+                warnings: trade.impactLevel == .forbidden ? [UniswapModule.UniswapWarning.highPriceImpact] : []
+        )
+
+        openConfirmRelay.accept(sendEvmData)
     }
 
 }

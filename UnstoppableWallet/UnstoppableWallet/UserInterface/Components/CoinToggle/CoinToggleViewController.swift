@@ -30,8 +30,6 @@ class CoinToggleViewController: ThemeSearchViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        tableView.registerCell(forClass: G4Cell.self)
-        tableView.registerCell(forClass: G21Cell.self)
         tableView.sectionDataSource = self
 
         tableView.backgroundColor = .clear
@@ -50,7 +48,7 @@ class CoinToggleViewController: ThemeSearchViewController {
     }
 
     private func onUpdate(viewItems: [CoinToggleViewModel.ViewItem]) {
-        let animated = self.viewItems.map { $0.fullCoin.coin } == viewItems.map { $0.fullCoin.coin }
+        let animated = self.viewItems.map { $0.uid } == viewItems.map { $0.uid }
         self.viewItems = viewItems
 
         if isLoaded {
@@ -58,53 +56,71 @@ class CoinToggleViewController: ThemeSearchViewController {
         }
     }
 
-    private func rows(viewItems: [CoinToggleViewModel.ViewItem]) -> [RowProtocol] {
-        viewItems.enumerated().map { index, viewItem in
-            let isLast = index == viewItems.count - 1
+    private func bind(cell: BaseThemeCell, viewItem: CoinToggleViewModel.ViewItem, isLast: Bool) {
+        cell.set(backgroundStyle: .claude, isLast: isLast)
 
-            switch viewItem.state {
-            case let .toggleVisible(enabled, hasSettings):
-                return Row<G21Cell>(
-                        id: "coin_\(viewItem.fullCoin.coin.uid)",
-                        hash: "coin_\(enabled)_\(hasSettings)_\(isLast)",
-                        height: .heightDoubleLineCell,
-                        bind: { [weak self] cell, _ in
-                            cell.set(backgroundStyle: .claude, isLast: isLast)
-                            //                        cell.titleImage = .image(coinType: viewItem.coin.type)
-                            cell.title = viewItem.fullCoin.coin.name
-                            cell.subtitle = viewItem.fullCoin.coin.code
-                            //                        cell.rightBadgeText = viewItem.coin.type.blockchainType
-                            cell.isOn = enabled
-                            cell.onToggle = { [weak self] enabled in
+        cell.bind(index: 0, block: { (component: ImageComponent) in
+            component.setImage(urlString: viewItem.imageUrl, placeholder: viewItem.placeholderImageName.flatMap { UIImage(named: $0) })
+        })
+
+        cell.bind(index: 1, block: { (component: MultiTextComponent) in
+            if let badge = viewItem.blockchainBadge {
+                component.set(style: .m7)
+                component.titleBadge.text = badge
+            } else {
+                component.set(style: .m1)
+            }
+            component.title.set(style: .b2)
+            component.subtitle.set(style: .d1)
+
+            component.title.text = viewItem.title
+            component.subtitle.text = viewItem.subtitle
+        })
+    }
+
+    private func row(viewItem: CoinToggleViewModel.ViewItem, isLast: Bool) -> RowProtocol {
+        switch viewItem.state {
+        case let .toggleVisible(enabled, hasSettings):
+            return CellBuilder.row(
+                    elements: [.image24, .multiText, hasSettings ? .margin4 : .margin16, .transparentIconButton, .margin4, .switch],
+                    tableView: tableView,
+                    id: "coin_\(viewItem.uid)",
+                    hash: "coin_\(enabled)_\(hasSettings)_\(isLast)",
+                    height: .heightDoubleLineCell,
+                    bind: { [weak self] cell in
+                        self?.bind(cell: cell, viewItem: viewItem, isLast: isLast)
+
+                        cell.bind(index: 2, block: { (component: TransparentIconButtonComponent) in
+                            component.isHidden = !hasSettings
+                            component.button.set(image: UIImage(named: "edit_20"))
+                            component.onTap = { [weak self] in
+                                self?.viewModel.onTapSettings(uid: viewItem.uid)
+                            }
+                        })
+
+                        cell.bind(index: 3) { (component: SwitchComponent) in
+                            component.switchView.isOn = enabled
+                            component.onSwitch = { [weak self] enabled in
                                 self?.onToggle(viewItem: viewItem, enabled: enabled)
                             }
-                            cell.rightButtonImage = hasSettings ? UIImage(named: "edit_20") : nil
-                            cell.onTapRightButton = { [weak self] in
-                                self?.viewModel.onTapSettings(fullCoin: viewItem.fullCoin)
-                            }
-
-                            cell.setTitleImage(urlString: viewItem.fullCoin.coin.imageUrl, placeholder: UIImage(named: viewItem.fullCoin.placeholderImageName))
                         }
-                )
-            case .toggleHidden:
-                return Row<G4Cell>(
-                        id: "coin_\(viewItem.fullCoin.coin.uid)",
-                        hash: "coin_\(isLast)",
-                        height: .heightDoubleLineCell,
-                        autoDeselect: true,
-                        bind: { cell, _ in
-                            cell.set(backgroundStyle: .claude, isLast: isLast)
-
-                            cell.title = viewItem.fullCoin.coin.name
-                            cell.subtitle = viewItem.fullCoin.coin.code
-
-                            cell.setTitleImage(urlString: viewItem.fullCoin.coin.imageUrl, placeholder: UIImage(named: viewItem.fullCoin.placeholderImageName))
-                        },
-                        action: { _ in
-                            print("On click \(viewItem.fullCoin.coin.name)")
-                        }
-                )
-            }
+                    }
+            )
+        case .toggleHidden:
+            return CellBuilder.selectableRow(
+                    elements: [.image24, .multiText],
+                    tableView: tableView,
+                    id: "coin_\(viewItem.uid)",
+                    hash: "coin_\(isLast)",
+                    height: .heightDoubleLineCell,
+                    autoDeselect: true,
+                    bind: { [weak self] cell in
+                        self?.bind(cell: cell, viewItem: viewItem, isLast: isLast)
+                    },
+                    action: {
+                        print("On click \(viewItem.uid)")
+                    }
+            )
         }
     }
 
@@ -114,22 +130,24 @@ class CoinToggleViewController: ThemeSearchViewController {
 
     private func onToggle(viewItem: CoinToggleViewModel.ViewItem, enabled: Bool) {
         if enabled {
-            viewModel.onEnable(fullCoin: viewItem.fullCoin)
+            viewModel.onEnable(uid: viewItem.uid)
         } else {
-            viewModel.onDisable(coin: viewItem.fullCoin.coin)
+            viewModel.onDisable(uid: viewItem.uid)
         }
     }
 
-    func setToggle(on: Bool, coin: Coin) {
-        guard let index = viewItems.firstIndex(where: { $0.fullCoin.coin == coin }) else {
+    func setToggle(on: Bool, uid: String) {
+        guard let index = viewItems.firstIndex(where: { $0.uid == uid }) else {
             return
         }
 
-        guard let cell = tableView.cellForRow(at: IndexPath(row: index, section: 0)) as? G21Cell else {
+        guard let cell = tableView.cellForRow(at: IndexPath(row: index, section: 0)) as? BaseThemeCell else {
             return
         }
 
-        cell.set(isOn: on, animated: true)
+        cell.bind(index: 3) { (component: SwitchComponent) in
+            component.switchView.setOn(on, animated: true)
+        }
     }
 
 }
@@ -142,7 +160,9 @@ extension CoinToggleViewController: SectionsDataSource {
                     id: "coins",
                     headerState: .margin(height: .margin4),
                     footerState: .margin(height: .margin32),
-                    rows: rows(viewItems: viewItems)
+                    rows: viewItems.enumerated().map { index, viewItem in
+                        row(viewItem: viewItem, isLast: index == viewItems.count - 1)
+                    }
             )
         ]
     }

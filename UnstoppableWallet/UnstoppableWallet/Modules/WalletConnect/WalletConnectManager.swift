@@ -2,29 +2,23 @@ import EthereumKit
 
 class WalletConnectManager {
     private let accountManager: IAccountManager
-    private let ethereumKitManager: EvmKitManager
-    private let binanceSmartChainKitManager: EvmKitManager
+    private let evmBlockchainManager: EvmBlockchainManager
 
-    init(accountManager: IAccountManager, ethereumKitManager: EvmKitManager, binanceSmartChainKitManager: EvmKitManager) {
+    init(accountManager: IAccountManager, evmBlockchainManager: EvmBlockchainManager) {
         self.accountManager = accountManager
-        self.ethereumKitManager = ethereumKitManager
-        self.binanceSmartChainKitManager = binanceSmartChainKitManager
+        self.evmBlockchainManager = evmBlockchainManager
     }
 
     var activeAccount: Account? {
         accountManager.activeAccount
     }
 
-    func evmKit(chainId: Int, account: Account) -> EthereumKit.Kit? {
-        if let ethereumKit = try? ethereumKitManager.evmKit(account: account), ethereumKit.networkType.chainId == chainId {
-            return ethereumKit
+    func evmKitWrapper(chainId: Int, account: Account) -> EvmKitWrapper? {
+        guard let blockchain = evmBlockchainManager.blockchain(chainId: chainId) else {
+            return nil
         }
 
-        if let binanceSmartChainKit = try? binanceSmartChainKitManager.evmKit(account: account), binanceSmartChainKit.networkType.chainId == chainId {
-            return binanceSmartChainKit
-        }
-
-        return nil
+        return try? evmBlockchainManager.evmKitManager(blockchain: blockchain).evmKitWrapper(account: account, blockchain: blockchain)
     }
 
 }

@@ -11,8 +11,7 @@ protocol ISendEvmTransactionService {
     var state: SendEvmTransactionService.State { get }
     var stateObservable: Observable<SendEvmTransactionService.State> { get }
 
-    var dataState: DataStatus<SendEvmTransactionService.DataState> { get }
-    var dataStateObservable: Observable<DataStatus<SendEvmTransactionService.DataState>> { get }
+    var dataState: SendEvmTransactionService.DataState { get }
 
     var sendState: SendEvmTransactionService.SendState { get }
     var sendStateObservable: Observable<SendEvmTransactionService.SendState> { get }
@@ -26,23 +25,18 @@ class SendEvmTransactionService {
     private let disposeBag = DisposeBag()
 
     private let sendData: SendEvmData
-    private let evmKit: EthereumKit.Kit
-    private let transactionService: EvmTransactionService
+    private let evmKitWrapper: EvmKitWrapper
+    private let feeService: EvmFeeService
     private let activateCoinManager: ActivateCoinManager
 
     private let stateRelay = PublishRelay<State>()
-    private(set) var state: State = .notReady(errors: []) {
+    private(set) var state: State = .notReady(errors: [], warnings: []) {
         didSet {
             stateRelay.accept(state)
         }
     }
 
-    private let dataStateRelay = PublishRelay<DataStatus<DataState>>()
-    private(set) var dataState: DataStatus<DataState> {
-        didSet {
-            dataStateRelay.accept(dataState)
-        }
-    }
+    private(set) var dataState: DataState
 
     private let sendStateRelay = PublishRelay<SendState>()
     private(set) var sendState: SendState = .idle {
@@ -51,69 +45,66 @@ class SendEvmTransactionService {
         }
     }
 
-    init(sendData: SendEvmData, gasPrice: Int? = nil, evmKit: EthereumKit.Kit, transactionService: EvmTransactionService, activateCoinManager: ActivateCoinManager) {
+    init(sendData: SendEvmData, evmKitWrapper: EvmKitWrapper, feeService: EvmFeeService, activateCoinManager: ActivateCoinManager) {
         self.sendData = sendData
-        self.evmKit = evmKit
-        self.transactionService = transactionService
+        self.evmKitWrapper = evmKitWrapper
+        self.feeService = feeService
         self.activateCoinManager = activateCoinManager
 
-        dataState = .completed(
-                DataState(
-                        transactionData: sendData.transactionData,
-                        additionalInfo: sendData.additionalInfo,
-                        decoration: evmKit.decorate(transactionData: sendData.transactionData)
-                )
+        dataState = DataState(
+                transactionData: sendData.transactionData,
+                additionalInfo: sendData.additionalInfo,
+                decoration: evmKitWrapper.evmKit.decorate(transactionData: sendData.transactionData)
         )
 
-        subscribe(disposeBag, transactionService.transactionStatusObservable) { [weak self] _ in self?.syncState() }
+        subscribe(disposeBag, feeService.statusObservable) { [weak self] in self?.sync(status: $0) }
+    }
 
-        transactionService.set(transactionData: sendData.transactionData)
-
-        if let gasPrice = gasPrice {
-            transactionService.set(gasPriceType: .custom(gasPrice: gasPrice))
-        }
+    private var evmKit: EthereumKit.Kit {
+        evmKitWrapper.evmKit
     }
 
     private var evmBalance: BigUInt {
         evmKit.accountState?.balance ?? 0
     }
 
-    private func syncState() {
-        switch transactionService.transactionStatus {
+    private func sync(status: DataStatus<FallibleData<EvmFeeModule.Transaction>>) {
+        switch status {
         case .loading:
-            state = .notReady(errors: [])
+            state = .notReady(errors: [], warnings: [])
         case .failed(let error):
-            state = .notReady(errors: [error])
             syncDataState()
-        case .completed(let transaction):
-            if transaction.totalAmount > evmBalance {
-                state = .notReady(errors: [TransactionError.insufficientBalance(requiredBalance: transaction.totalAmount)])
+            state = .notReady(errors: [error], warnings: [])
+        case .completed(let fallibleTransaction):
+            syncDataState(transaction: fallibleTransaction.data)
+
+            let warnings = sendData.warnings + fallibleTransaction.warnings
+
+            if fallibleTransaction.errors.isEmpty {
+                state = .ready(warnings: warnings)
             } else {
-                state = .ready
+                state = .notReady(errors: fallibleTransaction.errors, warnings: warnings)
             }
-            syncDataState(transaction: transaction)
         }
     }
 
-    private func syncDataState(transaction: EvmTransactionService.Transaction? = nil) {
+    private func syncDataState(transaction: EvmFeeModule.Transaction? = nil) {
         let transactionData = transaction?.transactionData ?? sendData.transactionData
 
-        dataState = .completed(
-                DataState(
-                        transactionData: transactionData,
-                        additionalInfo: sendData.additionalInfo,
-                        decoration: evmKit.decorate(transactionData: transactionData)
-                )
+        dataState = DataState(
+                transactionData: transactionData,
+                additionalInfo: sendData.additionalInfo,
+                decoration: evmKit.decorate(transactionData: transactionData)
         )
     }
 
     private func handlePostSendActions() {
-        if let decoration = dataState.data?.decoration as? SwapMethodDecoration {
+        if let decoration = dataState.decoration as? SwapMethodDecoration {
             activateUniswap(token: decoration.tokenIn)
             activateUniswap(token: decoration.tokenOut)
         }
 
-        if let decoration = dataState.data?.decoration as? OneInchMethodDecoration {
+        if let decoration = dataState.decoration as? OneInchMethodDecoration {
             var tokens = [OneInchMethodDecoration.Token]()
 
             switch decoration {
@@ -130,29 +121,15 @@ class SendEvmTransactionService {
 
     private func activateUniswap(token: SwapMethodDecoration.Token) {
         switch token {
-        case .evmCoin: activateCoinManager.activate(coinType: evmCoinType())
-        case .eip20Coin(let address): activateCoinManager.activate(coinType: eip20CoinType(contractAddress: address.hex))
+        case .evmCoin: activateCoinManager.activateBaseCoin(blockchain: evmKitWrapper.blockchain)
+        case .eip20Coin(let address): activateCoinManager.activateEvm20Coin(address: address.hex, blockchain: evmKitWrapper.blockchain)
         }
     }
 
     private func activateOneInch(token: OneInchMethodDecoration.Token) {
         switch token {
-        case .evmCoin: activateCoinManager.activate(coinType: evmCoinType())
-        case .eip20Coin(let address): activateCoinManager.activate(coinType: eip20CoinType(contractAddress: address.hex))
-        }
-    }
-
-    private func eip20CoinType(contractAddress: String) -> CoinType {
-        switch evmKit.networkType {
-            case .ethMainNet, .ropsten, .rinkeby, .kovan, .goerli: return .erc20(address: contractAddress)
-            case .bscMainNet: return .bep20(address: contractAddress)
-        }
-    }
-
-    private func evmCoinType() -> CoinType {
-        switch evmKit.networkType {
-        case .ethMainNet, .ropsten, .rinkeby, .kovan, .goerli: return .ethereum
-        case .bscMainNet: return .binanceSmartChain
+        case .evmCoin: activateCoinManager.activateBaseCoin(blockchain: evmKitWrapper.blockchain)
+        case .eip20Coin(let address): activateCoinManager.activateEvm20Coin(address: address.hex, blockchain: evmKitWrapper.blockchain)
         }
     }
 
@@ -164,10 +141,6 @@ extension SendEvmTransactionService: ISendEvmTransactionService {
         stateRelay.asObservable()
     }
 
-    var dataStateObservable: Observable<DataStatus<DataState>> {
-        dataStateRelay.asObservable()
-    }
-
     var sendStateObservable: Observable<SendState> {
         sendStateRelay.asObservable()
     }
@@ -177,13 +150,14 @@ extension SendEvmTransactionService: ISendEvmTransactionService {
     }
 
     func send() {
-        guard case .ready = state, case .completed(let transaction) = transactionService.transactionStatus else {
+        guard case .ready = state, case .completed(let fallibleTransaction) = feeService.status else {
             return
         }
+        let transaction = fallibleTransaction.data
 
         sendState = .sending
 
-        evmKit.sendSingle(
+        evmKitWrapper.sendSingle(
                         transactionData: transaction.transactionData,
                         gasPrice: transaction.gasData.gasPrice,
                         gasLimit: transaction.gasData.gasLimit,
@@ -204,8 +178,8 @@ extension SendEvmTransactionService: ISendEvmTransactionService {
 extension SendEvmTransactionService {
 
     enum State {
-        case ready
-        case notReady(errors: [Error])
+        case ready(warnings: [Warning])
+        case notReady(errors: [Error], warnings: [Warning])
     }
 
     struct DataState {

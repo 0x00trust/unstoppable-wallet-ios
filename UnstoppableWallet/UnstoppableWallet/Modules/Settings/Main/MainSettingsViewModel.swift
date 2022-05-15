@@ -15,6 +15,7 @@ class MainSettingsViewModel {
     private let baseCurrencyRelay: BehaviorRelay<String>
     private let themeModeRelay: BehaviorRelay<ThemeMode>
     private let aboutAlertRelay: BehaviorRelay<Bool>
+    private let openWalletConnectRelay = PublishRelay<WalletConnectOpenMode>()
     private let openLinkRelay = PublishRelay<String>()
 
     init(service: MainSettingsService) {
@@ -49,7 +50,9 @@ class MainSettingsViewModel {
                 })
                 .disposed(by: disposeBag)
 
-        subscribe(disposeBag, service.launchScreenObservable) { [weak self] in self?.launchScreenRelay.accept($0.title) }
+        subscribe(disposeBag, service.launchScreenObservable) { [weak self] in
+            self?.launchScreenRelay.accept($0.title)
+        }
 
         service.baseCurrencyObservable
                 .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .userInitiated))
@@ -80,6 +83,10 @@ class MainSettingsViewModel {
 }
 
 extension MainSettingsViewModel {
+
+    var openWalletConnectSignal: Signal<WalletConnectOpenMode> {
+        openWalletConnectRelay.asSignal()
+    }
 
     var openLinkSignal: Signal<String> {
         openLinkRelay.asSignal()
@@ -125,6 +132,15 @@ extension MainSettingsViewModel {
         service.appVersion
     }
 
+    func onTapWalletConnect() {
+        guard let activeAccount = service.activeAccount else {
+            openWalletConnectRelay.accept(.noAccount)
+            return
+        }
+
+        openWalletConnectRelay.accept(activeAccount.watchAccount ? .watchAccount : .list)
+    }
+
     func onTapCompanyLink() {
         openLinkRelay.accept(service.companyWebPageLink)
     }
@@ -134,8 +150,9 @@ extension MainSettingsViewModel {
 extension MainSettingsViewModel {
 
     enum WalletConnectOpenMode {
-        case sessionList
-        case qrScanner
+        case list
+        case noAccount
+        case watchAccount
     }
 
 }

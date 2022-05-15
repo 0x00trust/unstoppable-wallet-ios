@@ -32,7 +32,7 @@ class SendBinanceHandler {
         }
 
         do {
-            try addressModule.validateAddress()
+            _ = try addressModule.validAddress()
         } catch {
             addressError = error
         }
@@ -100,10 +100,6 @@ extension SendBinanceHandler: ISendAmountDelegate {
 }
 
 extension SendBinanceHandler: ISendAddressDelegate {
-
-    func validate(address: String) throws {
-        try interactor.validate(address: address)
-    }
 
     func onUpdateAddress() {
         syncValidation()
