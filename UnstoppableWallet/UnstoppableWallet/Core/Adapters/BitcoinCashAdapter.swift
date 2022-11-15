@@ -1,14 +1,13 @@
 import BitcoinCashKit
+import BitcoinCore
 import RxSwift
+import MarketKit
+import HdWalletKit
 
 class BitcoinCashAdapter: BitcoinBaseAdapter {
-    private let bitcoinCashKit: Kit
+    private let bitcoinCashKit: BitcoinCashKit.Kit
 
-    init(wallet: Wallet, syncMode: SyncMode, testMode: Bool) throws {
-        guard let seed = wallet.account.type.mnemonicSeed else {
-            throw AdapterError.unsupportedAccount
-        }
-
+    init(wallet: Wallet, syncMode: BitcoinCore.SyncMode, testMode: Bool) throws {
         guard let bitcoinCashCoinType = wallet.coinSettings.bitcoinCashCoinType else {
             throw AdapterError.wrongParameters
         }
@@ -20,10 +19,35 @@ class BitcoinCashAdapter: BitcoinBaseAdapter {
         case .type145: kitCoinType = .type145
         }
 
-        let networkType: Kit.NetworkType = testMode ? .testNet : .mainNet(coinType: kitCoinType)
+        let networkType: BitcoinCashKit.Kit.NetworkType = testMode ? .testNet : .mainNet(coinType: kitCoinType)
         let logger = App.shared.logger.scoped(with: "BitcoinCashKit")
 
-        bitcoinCashKit = try Kit(seed: seed, walletId: wallet.account.id, syncMode: BitcoinBaseAdapter.kitMode(from: syncMode), networkType: networkType, confirmationsThreshold: BitcoinBaseAdapter.confirmationsThreshold, logger: logger)
+        switch wallet.account.type {
+        case let .mnemonic(words, salt):
+            guard let seed = Mnemonic.seed(mnemonic: words, passphrase: salt) else {
+                throw AdapterError.unsupportedAccount
+            }
+
+            bitcoinCashKit = try BitcoinCashKit.Kit(
+                    seed: seed,
+                    walletId: wallet.account.id,
+                    syncMode: syncMode,
+                    networkType: networkType,
+                    confirmationsThreshold: BitcoinBaseAdapter.confirmationsThreshold,
+                    logger: logger
+            )
+        case let .hdExtendedKey(key):
+            bitcoinCashKit = try BitcoinCashKit.Kit(
+                    extendedKey: key,
+                    walletId: wallet.account.id,
+                    syncMode: syncMode,
+                    networkType: networkType,
+                    confirmationsThreshold: BitcoinBaseAdapter.confirmationsThreshold,
+                    logger: logger
+            )
+        default:
+            throw AdapterError.unsupportedAccount
+        }
 
         super.init(abstractKit: bitcoinCashKit, wallet: wallet, testMode: testMode)
 
@@ -41,6 +65,11 @@ class BitcoinCashAdapter: BitcoinBaseAdapter {
 }
 
 extension BitcoinCashAdapter: ISendBitcoinAdapter {
+
+    var blockchainType: BlockchainType {
+        .bitcoinCash
+    }
+
 }
 
 extension BitcoinCashAdapter {

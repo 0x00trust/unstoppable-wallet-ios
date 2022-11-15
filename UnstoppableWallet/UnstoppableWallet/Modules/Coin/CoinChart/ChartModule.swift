@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import CurrencyKit
 import Chart
 
@@ -25,7 +26,7 @@ struct ChartIndicatorSet: OptionSet, Hashable {
     }
 
     var hideVolumes: Bool {
-        rawValue > 0
+        rawValue > 1
     }
 
     public func hash(into hasher: inout Hasher) {

@@ -1,7 +1,8 @@
+import Foundation
 import RxSwift
 import RxRelay
 import RxCocoa
-import EthereumKit
+import EvmKit
 
 class EvmNetworkViewModel {
     private let service: EvmNetworkService
@@ -24,11 +25,9 @@ class EvmNetworkViewModel {
     }
 
     private func viewItem(item: EvmNetworkService.Item) -> ViewItem {
-        let urls = item.syncSource.rpcSource.urls
-
-        return ViewItem(
+        ViewItem(
                 name: item.syncSource.name,
-                url: urls.count == 1 ? urls[0].absoluteString : "evm_network.switches_automatically".localized,
+                url: item.syncSource.rpcSource.url?.absoluteString,
                 selected: item.selected
         )
     }
@@ -49,6 +48,10 @@ extension EvmNetworkViewModel {
         service.blockchain.name
     }
 
+    var iconUrl: String {
+        service.blockchain.type.imageUrl
+    }
+
     func onSelectViewItem(index: Int) {
         let item = service.items[index]
         service.setCurrent(syncSource: item.syncSource)
@@ -61,7 +64,7 @@ extension EvmNetworkViewModel {
 
     struct ViewItem {
         let name: String
-        let url: String
+        let url: String?
         let selected: Bool
     }
 
@@ -69,10 +72,10 @@ extension EvmNetworkViewModel {
 
 extension RpcSource {
 
-    var urls: [URL] {
+    var url: URL? {
         switch self {
-        case .http(let urls, _): return urls
-        case .webSocket(let url, _): return [url]
+        case .http(let urls, _): return urls.first
+        case .webSocket(let url, _): return url
         }
     }
 

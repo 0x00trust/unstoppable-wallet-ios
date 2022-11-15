@@ -1,6 +1,6 @@
 import UIKit
 import MarketKit
-import EthereumKit
+import EvmKit
 import SectionsTableView
 import ThemeKit
 import RxSwift
@@ -41,8 +41,8 @@ protocol ISwapDataSource: AnyObject {
 
 class SwapModule {
 
-    static func viewController(platformCoinFrom: PlatformCoin? = nil) -> UIViewController? {
-        let swapDexManager = SwapProviderManager(localStorage: App.shared.localStorage, evmBlockchainManager: App.shared.evmBlockchainManager, platformCoinFrom: platformCoinFrom)
+    static func viewController(tokenFrom: Token? = nil) -> UIViewController? {
+        let swapDexManager = SwapProviderManager(localStorage: App.shared.localStorage, evmBlockchainManager: App.shared.evmBlockchainManager, tokenFrom: tokenFrom)
 
         let viewModel =  SwapViewModel(dexManager: swapDexManager)
         let viewController = SwapViewController(
@@ -56,21 +56,37 @@ class SwapModule {
 }
 
 extension SwapModule {
+    private static let addressesForRevoke = ["0xdac17f958d2ee523a2206206994597c13d831ec7"]
+
+    static func mustBeRevoked(token: Token?) -> Bool {
+        if let token = token,
+           case .ethereum = token.blockchainType,
+           case .eip20(let address) = token.type,
+           Self.addressesForRevoke.contains(address.lowercased()) {
+            return true
+        }
+
+        return false
+    }
+
+}
+
+extension SwapModule {
 
     enum ApproveStepState: Int {
-        case notApproved, approveRequired, approving, approved
+        case notApproved, revokeRequired, revoking, approveRequired, approving, approved
     }
 
     class DataSourceState {
-        var platformCoinFrom: PlatformCoin?
-        var platformCoinTo: PlatformCoin?
+        var tokenFrom: Token?
+        var tokenTo: Token?
         var amountFrom: Decimal?
         var amountTo: Decimal?
         var exactFrom: Bool
 
-        init(platformCoinFrom: PlatformCoin?, platformCoinTo: PlatformCoin? = nil, amountFrom: Decimal? = nil, amountTo: Decimal? = nil, exactFrom: Bool = true) {
-            self.platformCoinFrom = platformCoinFrom
-            self.platformCoinTo = platformCoinTo
+        init(tokenFrom: Token?, tokenTo: Token? = nil, amountFrom: Decimal? = nil, amountTo: Decimal? = nil, exactFrom: Bool = true) {
+            self.tokenFrom = tokenFrom
+            self.tokenTo = tokenTo
             self.amountFrom = amountFrom
             self.amountTo = amountTo
             self.exactFrom = exactFrom
@@ -79,9 +95,9 @@ extension SwapModule {
     }
 
     class Dex {
-        var blockchain: EvmBlockchain {
+        var blockchainType: BlockchainType {
             didSet {
-                let allowedProviders = blockchain.allowedProviders
+                let allowedProviders = blockchainType.allowedProviders
                 if !allowedProviders.contains(provider) {
                     provider = allowedProviders[0]
                 }
@@ -90,14 +106,14 @@ extension SwapModule {
 
         var provider: Provider {
             didSet {
-                if !provider.allowedBlockchains.contains(blockchain) {
-                    blockchain = provider.allowedBlockchains[0]
+                if !provider.allowedBlockchainTypes.contains(blockchainType) {
+                    blockchainType = provider.allowedBlockchainTypes[0]
                 }
             }
         }
 
-        init(blockchain: EvmBlockchain, provider: Provider) {
-            self.blockchain = blockchain
+        init(blockchainType: BlockchainType, provider: Provider) {
+            self.blockchainType = blockchainType
             self.provider = provider
         }
 
@@ -107,21 +123,44 @@ extension SwapModule {
 
 extension SwapModule {
 
-    enum SwapError: Error {
+    enum SwapError: Error, Equatable {
         case noBalanceIn
         case insufficientBalanceIn
         case insufficientAllowance
+        case needRevokeAllowance(allowance: CoinValue)
+
+        static func ==(lhs: SwapError, rhs: SwapError) -> Bool {
+            switch (lhs, rhs) {
+            case (.noBalanceIn, .noBalanceIn): return true
+            case (.insufficientBalanceIn, .insufficientBalanceIn): return true
+            case (.insufficientAllowance, .insufficientAllowance): return true
+            case (.needRevokeAllowance(let lAllowance), .needRevokeAllowance(let rAllowance)): return lAllowance == rAllowance
+            default: return false
+            }
+        }
+
+        var revokeAllowance: CoinValue? {
+            switch self {
+            case .needRevokeAllowance(let allowance): return allowance
+            default: return nil
+            }
+        }
+
     }
 
 }
 
-extension EvmBlockchain {
+extension BlockchainType {
 
     var allowedProviders: [SwapModule.Dex.Provider] {
         switch self {
         case .ethereum: return [.oneInch, .uniswap]
         case .binanceSmartChain: return [.oneInch, .pancake]
         case .polygon: return [.oneInch, .quickSwap]
+        case .avalanche: return [.oneInch]
+        case .optimism: return [.oneInch]
+        case .arbitrumOne: return [.oneInch]
+        default: return []
         }
     }
 
@@ -135,10 +174,10 @@ extension SwapModule.Dex {
         case pancake = "PancakeSwap"
         case quickSwap = "QuickSwap"
 
-        var allowedBlockchains: [EvmBlockchain] {
+        var allowedBlockchainTypes: [BlockchainType] {
             switch self {
             case .uniswap: return [.ethereum]
-            case .oneInch: return [.ethereum, .binanceSmartChain, .polygon]
+            case .oneInch: return [.ethereum, .binanceSmartChain, .polygon, .avalanche, .optimism, .arbitrumOne]
             case .pancake: return [.binanceSmartChain]
             case .quickSwap: return [.polygon]
             }

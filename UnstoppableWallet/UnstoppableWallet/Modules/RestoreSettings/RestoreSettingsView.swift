@@ -2,6 +2,7 @@ import UIKit
 import RxSwift
 import RxCocoa
 import MarketKit
+import ThemeKit
 
 class RestoreSettingsView {
     private let viewModel: RestoreSettingsViewModel
@@ -12,21 +13,21 @@ class RestoreSettingsView {
     init(viewModel: RestoreSettingsViewModel) {
         self.viewModel = viewModel
 
-        subscribe(disposeBag, viewModel.openBirthdayAlertSignal) { [weak self] platformCoin in
-            self?.showBirthdayAlert(platformCoin: platformCoin)
+        subscribe(disposeBag, viewModel.openBirthdayAlertSignal) { [weak self] token in
+            self?.showBirthdayAlert(token: token)
         }
     }
 
-    private func showBirthdayAlert(platformCoin: PlatformCoin) {
-        let controller = BirthdayInputViewController(platformCoin: platformCoin, delegate: self).toAlert
-        onOpenController?(controller)
+    private func showBirthdayAlert(token: Token) {
+        let controller = BirthdayInputViewController(token: token, delegate: self)
+        onOpenController?(ThemeNavigationController(rootViewController: controller))
     }
 
 }
 
 extension RestoreSettingsView: IBirthdayInputDelegate {
 
-    func didEnter(birthdayHeight: Int) {
+    func didEnter(birthdayHeight: Int?) {
         viewModel.onEnter(birthdayHeight: birthdayHeight)
     }
 

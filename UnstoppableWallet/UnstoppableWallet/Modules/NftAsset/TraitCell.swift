@@ -21,6 +21,7 @@ class TraitCell: UICollectionViewCell {
 
         contentView.backgroundColor = .themeLawrence
         contentView.cornerRadius = .cornerRadius12
+        contentView.layer.cornerCurve = .continuous
 
         contentView.addSubview(titleStackView)
         titleStackView.snp.makeConstraints { maker in
@@ -55,7 +56,7 @@ class TraitCell: UICollectionViewCell {
         fatalError("not implemented")
     }
 
-    func bind(viewItem: NftAssetViewModel.TraitViewItem) {
+    func bind(viewItem: NftAssetOverviewViewModel.TraitViewItem) {
         valueLabel.text = viewItem.value
         typeLabel.text = viewItem.type
         percentBadge.text = viewItem.percent
@@ -63,10 +64,10 @@ class TraitCell: UICollectionViewCell {
         percentBadge.isHidden = viewItem.percent == nil
     }
 
-    static func size(for viewItem: NftAssetViewModel.TraitViewItem, containerWidth: CGFloat) -> CGSize {
+    static func size(for viewItem: NftAssetOverviewViewModel.TraitViewItem, containerWidth: CGFloat) -> CGSize {
         let availableWidth = containerWidth - 2 * horizontalPadding
 
-        let badgeWidth = (viewItem.percent.map { BadgeView.width(for: $0, style: .small) }) ?? 0
+        let badgeWidth = (viewItem.percent.map { BadgeView.width(for: $0, change: nil, style: .small) }) ?? 0
         let availableValueWidth = availableWidth - (badgeWidth == 0 ? 0 : insidePadding) - badgeWidth
         let valueWidth = viewItem.value.size(containerWidth: availableValueWidth, font: valueFont).width
         let titleWidth = 2 * horizontalPadding + valueWidth + badgeWidth

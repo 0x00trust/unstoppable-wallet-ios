@@ -1,3 +1,4 @@
+import Foundation
 import RxSwift
 import RxRelay
 import RxCocoa
@@ -16,7 +17,7 @@ class WalletViewModel {
     private let openReceiveRelay = PublishRelay<Wallet>()
     private let openBackupRequiredRelay = PublishRelay<Wallet>()
     private let openCoinPageRelay = PublishRelay<Coin>()
-    private let showErrorRelay = PublishRelay<String>()
+    private let noConnectionErrorRelay = PublishRelay<()>()
     private let openSyncErrorRelay = PublishRelay<(Wallet, Error)>()
     private let playHapticRelay = PublishRelay<()>()
     private let scrollToTopRelay = PublishRelay<()>()
@@ -36,6 +37,7 @@ class WalletViewModel {
         subscribe(disposeBag, service.itemUpdatedObservable) { [weak self] in self?.syncUpdated(item: $0) }
         subscribe(disposeBag, service.itemsObservable) { [weak self] in self?.sync(items: $0) }
         subscribe(disposeBag, service.sortTypeObservable) { [weak self] in self?.sync(sortType: $0, scrollToTop: true) }
+        subscribe(disposeBag, service.balancePrimaryValueObservable) { [weak self] _ in self?.onUpdateBalancePrimaryValue() }
 
         sync(activeAccount: service.activeAccount)
         sync(totalItem: service.totalItem)
@@ -52,8 +54,12 @@ class WalletViewModel {
         sync(totalItem: service.totalItem)
     }
 
+    private func onUpdateBalancePrimaryValue() {
+        sync(items: service.items)
+    }
+
     private func sync(totalItem: WalletService.TotalItem?) {
-        let headerViewItem = totalItem.map { factory.headerViewItem(totalItem: $0, balanceHidden: service.balanceHidden, watchAccount: service.watchAccount, watchAccountAddress: service.watchAccountAddress) }
+        let headerViewItem = totalItem.map { factory.headerViewItem(totalItem: $0, balanceHidden: service.balanceHidden, watchAccount: service.watchAccount) }
         headerViewItemRelay.accept(headerViewItem)
     }
 
@@ -88,7 +94,13 @@ class WalletViewModel {
     }
 
     private func viewItem(item: WalletService.Item) -> BalanceViewItem {
-        factory.viewItem(item: item, balanceHidden: service.balanceHidden, actionsHidden: service.watchAccount, expanded: item.wallet == expandedWallet)
+        factory.viewItem(
+                item: item,
+                balancePrimaryValue: service.balancePrimaryValue,
+                balanceHidden: service.balanceHidden,
+                watchAccount: service.watchAccount,
+                expanded: item.wallet == expandedWallet
+        )
     }
 
     private func syncViewItem(wallet: Wallet) {
@@ -135,8 +147,8 @@ extension WalletViewModel {
         openCoinPageRelay.asSignal()
     }
 
-    var showErrorSignal: Signal<String> {
-        showErrorRelay.asSignal()
+    var noConnectionErrorSignal: Signal<()> {
+        noConnectionErrorRelay.asSignal()
     }
 
     var openSyncErrorSignal: Signal<(Wallet, Error)> {
@@ -168,35 +180,40 @@ extension WalletViewModel {
         !service.watchAccount
     }
 
+    var lastCreatedAccount: Account? {
+        service.lastCreatedAccount
+    }
+
     func onSelectSortType(index: Int) {
         service.sortType = WalletModule.SortType.allCases[index]
     }
 
     func onTapTotalAmount() {
-        service.balanceHidden = !service.balanceHidden
+        service.toggleBalanceHidden()
+        playHapticRelay.accept(())
+    }
+
+    func onTapConvertedTotalAmount() {
+        service.toggleConversionCoin()
         playHapticRelay.accept(())
     }
 
     func onTap(wallet: Wallet) {
-        if service.watchAccount {
-            onTapChart(wallet: wallet)
-        } else {
-            queue.async {
-                if self.expandedWallet == wallet {
-                    self.expandedWallet = nil
-                    self.syncViewItem(wallet: wallet)
-                } else {
-                    let oldExpandedWallet = self.expandedWallet
-                    self.expandedWallet = wallet
+        queue.async {
+            if self.expandedWallet == wallet {
+                self.expandedWallet = nil
+                self.syncViewItem(wallet: wallet)
+            } else {
+                let oldExpandedWallet = self.expandedWallet
+                self.expandedWallet = wallet
 
-                    if let oldExpandedWallet = oldExpandedWallet {
-                        self.syncViewItem(wallet: oldExpandedWallet)
-                    }
-                    self.syncViewItem(wallet: wallet)
+                if let oldExpandedWallet = oldExpandedWallet {
+                    self.syncViewItem(wallet: oldExpandedWallet)
                 }
-
-                self.viewItemsRelay.accept(self.viewItems)
+                self.syncViewItem(wallet: wallet)
             }
+
+            self.viewItemsRelay.accept(self.viewItems)
         }
     }
 
@@ -217,6 +234,11 @@ extension WalletViewModel {
     }
 
     func onTapFailedIcon(wallet: Wallet) {
+        guard service.isReachable else {
+            noConnectionErrorRelay.accept(())
+            return
+        }
+
         guard let item = service.item(wallet: wallet) else {
             return
         }
@@ -225,11 +247,7 @@ extension WalletViewModel {
             return
         }
 
-        if let appError = error as? AppError, case .noConnection = appError {
-            showErrorRelay.accept(appError.smartDescription)
-        } else {
-            openSyncErrorRelay.accept((wallet, error))
-        }
+        openSyncErrorRelay.accept((wallet, error))
     }
 
     func onAppear() {
@@ -265,8 +283,9 @@ extension WalletViewModel {
     struct HeaderViewItem {
         let amount: String?
         let amountExpired: Bool
-        let manageWalletsHidden: Bool
-        let address: String?
+        let convertedValue: String?
+        let convertedValueExpired: Bool
+        let watchAccount: Bool
     }
 
 }

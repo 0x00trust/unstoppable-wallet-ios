@@ -1,27 +1,32 @@
 import UIKit
 import ThemeKit
+import MarketKit
 
 struct UniswapSettingsModule {
 
     static func dataSource(tradeService: UniswapTradeService) -> ISwapSettingsDataSource? {
-        guard let ethereumPlatformCoin = try? App.shared.marketKit.platformCoin(coinType: .ethereum) else {
+        guard let ethereumToken = try? App.shared.marketKit.token(query: TokenQuery(blockchainType: .ethereum, tokenType: .native)) else {
             return nil
         }
-        let platformCoin = tradeService.platformCoinIn
+        let token = tradeService.tokenIn
 
-        let coinCode = platformCoin?.code ?? ethereumPlatformCoin.code
-        let chainCoinCode = platformCoin.flatMap { UDNAddressParserItem.chainCoinCode(coinType: $0.platform.coinType) }
-        let chain = platformCoin.flatMap { UDNAddressParserItem.chain(coinType: $0.platform.coinType) }
+        let coinCode = token?.coin.code ?? ethereumToken.coin.code
 
+        let evmAddressParserItem = EvmAddressParser()
+        let udnAddressParserItem = UdnAddressParserItem.item(rawAddressParserItem: evmAddressParserItem, coinCode: coinCode, token: token)
         let addressParserChain = AddressParserChain()
-                .append(handler: EvmAddressParser())
-                .append(handler: UDNAddressParserItem(coinCode: coinCode, platformCoinCode: chainCoinCode, chain: chain))
+                .append(handler: evmAddressParserItem)
+                .append(handler: udnAddressParserItem)
 
-        let addressUriParser = AddressParserFactory.parser(coinType: ethereumPlatformCoin.coinType)
+        if let ensAddressParserItem = EnsAddressParserItem(rpcSource: App.shared.evmSyncSourceManager.infuraRpcSource, rawAddressParserItem: evmAddressParserItem) {
+            addressParserChain.append(handler: ensAddressParserItem)
+        }
+
+        let addressUriParser = AddressParserFactory.parser(blockchainType: ethereumToken.blockchainType)
         let addressService = AddressService(addressUriParser: addressUriParser, addressParserChain: addressParserChain, initialAddress: tradeService.settings.recipient)
 
         let service = UniswapSettingsService(tradeOptions: tradeService.settings, addressService: addressService)
-        let viewModel = UniswapSettingsViewModel(service: service, tradeService: tradeService, decimalParser: AmountDecimalParser())
+        let viewModel = UniswapSettingsViewModel(service: service, tradeService: tradeService)
 
         let recipientViewModel = RecipientAddressViewModel(service: addressService, handlerDelegate: nil)
         let slippageViewModel = SwapSlippageViewModel(service: service, decimalParser: AmountDecimalParser())

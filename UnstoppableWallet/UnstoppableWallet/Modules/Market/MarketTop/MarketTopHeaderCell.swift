@@ -20,7 +20,7 @@ class MarketTopHeaderCell: UITableViewCell {
         }
 
         nameLabel.font = .headline1
-        nameLabel.textColor = .themeOz
+        nameLabel.textColor = .themeLeah
         nameLabel.text = "market.top.title".localized
 
         contentView.addSubview(descriptionLabel)
@@ -46,6 +46,12 @@ class MarketTopHeaderCell: UITableViewCell {
 
     required public init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    func set(title: String, description: String, imageName: String) {
+        nameLabel.text = title
+        descriptionLabel.text = description
+        topImageView.image = UIImage(named: imageName)
     }
 
 }

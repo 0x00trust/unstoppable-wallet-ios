@@ -54,10 +54,10 @@ enum DataStatus<T> {
         return .loading
     }
 
-    func map<R>(_ transform: (T) -> R) -> DataStatus<R> {
+    func map<R>(_ transform: (T) -> R, transformError: ((Error) -> Error)? = nil) -> DataStatus<R> {
         switch self {
         case .loading: return .loading
-        case .failed(let error): return .failed(error)
+        case .failed(let error): return .failed(transformError?(error) ?? error)
         case .completed(let data): return .completed(transform(data))
         }
     }
@@ -95,6 +95,21 @@ extension DataStatus: Equatable {
     public static func ==(lhs: DataStatus<T>, rhs: DataStatus<T>) -> Bool {
         switch (lhs, rhs) {
         case (.loading, .loading), (.completed, .completed), (.failed, .failed): return true
+        default: return false
+        }
+    }
+
+}
+
+extension DataStatus where T: Equatable {
+
+    func equalTo(_ rhs: DataStatus<T>) -> Bool  {
+        switch (self, rhs) {
+        case (.loading, .loading): return true
+        case (.failed(let lhsValue), .failed(let rhsValue)):
+            return lhsValue.smartDescription == rhsValue.smartDescription
+        case (.completed(let lhsValue), .completed(let rhsValue)):
+            return lhsValue == rhsValue
         default: return false
         }
     }

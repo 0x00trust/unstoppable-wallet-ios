@@ -1,15 +1,18 @@
 import UIKit
 import HUD
+import ComponentKit
 
 class FeeSliderWrapper: UIView {
     private let slider = FeeSlider()
-    private let minimumImage = UIImageView(image: UIImage(named: "minus_2_20"))
-    private let maximumImage = UIImageView(image: UIImage(named: "plus_2_20"))
+    private let decreaseButton = UIButton()
+    private let increaseButton = UIButton()
 
     private let feeRateView = FeeSliderValueView()
-    private var sliderLastValue: Int?
+    private var sliderLastValue: Float?
+    private var step: Int = 1
+    var scale: FeePriceScale = FeePriceScale.gwei
 
-    var finishTracking: ((Int) -> ())?
+    var finishTracking: ((Float) -> ())?
 
     var sliderRange: ClosedRange<Int> {
         Int(slider.minimumValue)...Int(slider.maximumValue)
@@ -23,13 +26,13 @@ class FeeSliderWrapper: UIView {
         super.init(frame: CGRect.zero)
 
         addSubview(slider)
-        addSubview(minimumImage)
-        addSubview(maximumImage)
+        addSubview(decreaseButton)
+        addSubview(increaseButton)
 
         slider.snp.makeConstraints { maker in
             maker.top.bottom.equalToSuperview()
-            maker.leading.equalTo(minimumImage.snp.trailing).offset(CGFloat.margin2x)
-            maker.trailing.equalTo(maximumImage.snp.leading).offset(-CGFloat.margin2x)
+            maker.leading.equalTo(decreaseButton.snp.trailing).offset(CGFloat.margin2x)
+            maker.trailing.equalTo(increaseButton.snp.leading).offset(-CGFloat.margin2x)
         }
         slider.onTracking = { [weak self] value, position in
             self?.onTracking(value, position: position)
@@ -40,23 +43,47 @@ class FeeSliderWrapper: UIView {
         slider.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
         slider.setContentHuggingPriority(.defaultLow, for: .vertical)
 
-        minimumImage.snp.makeConstraints { maker in
+        decreaseButton.snp.makeConstraints { maker in
             maker.leading.equalToSuperview()
             maker.centerY.equalTo(slider)
         }
-        minimumImage.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        decreaseButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        decreaseButton.setImage(UIImage(named: "minus_2_20"), for: .normal)
+        decreaseButton.addTarget(self, action: #selector(decrease), for: .touchUpInside)
 
-        maximumImage.snp.makeConstraints { maker in
+        increaseButton.snp.makeConstraints { maker in
             maker.trailing.equalToSuperview()
             maker.centerY.equalTo(slider)
         }
-        maximumImage.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        increaseButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        increaseButton.setImage(UIImage(named: "plus_2_20"), for: .normal)
+        increaseButton.addTarget(self, action: #selector(increase), for: .touchUpInside)
+
     }
 
-    func set(value: Int, range: ClosedRange<Int>, description: String?) {
-        slider.minimumValue = Float(range.lowerBound)
-        slider.maximumValue = Float(range.upperBound)
-        slider.value = Float(value)
+    @objc private func decrease() {
+        guard Int(slider.value) > Int(slider.minimumValue) else {
+            return
+        }
+        slider.value = max(slider.value - Float(step), slider.minimumValue)
+
+        finishTracking?(slider.value)
+    }
+
+    @objc private func increase() {
+        guard Int(slider.value) < Int(slider.maximumValue) else {
+            return
+        }
+        slider.value = min(slider.value + Float(step), slider.maximumValue)
+
+        finishTracking?(slider.value)
+    }
+
+    func set(value: Float, range: ClosedRange<Float>, step: Int, description: String?) {
+        slider.minimumValue = range.lowerBound
+        slider.maximumValue = range.upperBound
+        slider.value = value
+        self.step = step
 
         feeRateView.set(descriptionText: description)
         sliderLastValue = value
@@ -75,9 +102,9 @@ class FeeSliderWrapper: UIView {
         feeConfig.blurEffectIntensity = nil
         feeConfig.borderColor = .themeSteel20
         feeConfig.borderWidth = .heightOnePixel
-        feeConfig.exactSize = true
+        feeConfig.exactSize = false
         feeConfig.preferredSize = CGSize(width: hudWidth, height: 48)
-        feeConfig.cornerRadius = CGFloat.cornerRadius2x
+        feeConfig.cornerRadius = .cornerRadius8
         feeConfig.handleKeyboard = .none
         feeConfig.inAnimationDuration = 0
         feeConfig.outAnimationDuration = 0
@@ -88,14 +115,17 @@ class FeeSliderWrapper: UIView {
         return feeConfig
     }
 
-    private func onTracking(_ value: Int, position: CGPoint) {
+    private func onTracking(_ value: Float, position: CGPoint) {
         HUD.instance.config = hudConfig(position: position)
 
-        feeRateView.set(value: "\(value)")
+        let roundedValue = scale.wrap(value: value, step: step)
+        let displayValue = scale.description(value: roundedValue, showSymbol: false)
+
+        feeRateView.set(value: displayValue)
         HUD.instance.showHUD(feeRateView)
     }
 
-    private func onFinishTracking(_ value: Int) {
+    private func onFinishTracking(_ value: Float) {
         HUD.instance.hide()
 
         guard sliderLastValue != value else {

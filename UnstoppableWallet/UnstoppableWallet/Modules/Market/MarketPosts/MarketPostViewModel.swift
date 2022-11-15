@@ -1,3 +1,4 @@
+import Foundation
 import RxSwift
 import RxRelay
 import RxCocoa
@@ -9,7 +10,7 @@ class MarketPostViewModel {
 
     private let viewItemsRelay = BehaviorRelay<[ViewItem]?>(value: nil)
     private let loadingRelay = BehaviorRelay<Bool>(value: false)
-    private let errorRelay = BehaviorRelay<String?>(value: nil)
+    private let syncErrorRelay = BehaviorRelay<Bool>(value: false)
 
     init(service: MarketPostService) {
         self.service = service
@@ -24,15 +25,15 @@ class MarketPostViewModel {
         case .loading:
             viewItemsRelay.accept(nil)
             loadingRelay.accept(true)
-            errorRelay.accept(nil)
+            syncErrorRelay.accept(false)
         case .loaded(let posts):
             viewItemsRelay.accept(posts.map { viewItem(post: $0) })
             loadingRelay.accept(false)
-            errorRelay.accept(nil)
+            syncErrorRelay.accept(false)
         case .failed:
             viewItemsRelay.accept(nil)
             loadingRelay.accept(false)
-            errorRelay.accept("market.sync_error".localized)
+            syncErrorRelay.accept(true)
         }
     }
 
@@ -77,8 +78,12 @@ extension MarketPostViewModel {
         loadingRelay.asDriver()
     }
 
-    var errorDriver: Driver<String?> {
-        errorRelay.asDriver()
+    var syncErrorDriver: Driver<Bool> {
+        syncErrorRelay.asDriver()
+    }
+
+    func onLoad() {
+        service.load()
     }
 
     func refresh() {

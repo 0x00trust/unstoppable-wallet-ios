@@ -4,21 +4,28 @@ import ThemeKit
 import SnapKit
 import SectionsTableView
 import ComponentKit
+import HUD
 
 class MarketDiscoveryViewController: ThemeSearchViewController {
     private let viewModel: MarketDiscoveryViewModel
     private let disposeBag = DisposeBag()
 
+    private let headerView: MarketSingleSortHeaderView
+    private let spinner = HUDActivityView.create(with: .medium24)
+    private let errorView = PlaceholderViewModule.reachabilityView()
     private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewFlowLayout())
     private let tableView = SectionsTableView(style: .grouped)
+
+    private let notFoundPlaceholder = PlaceholderView(layoutType: .keyboard)
 
     private var discoveryViewItems = [MarketDiscoveryViewModel.DiscoveryViewItem]()
     private var searchViewItems = [MarketDiscoveryViewModel.SearchViewItem]()
 
     private var isLoaded = false
 
-    init(viewModel: MarketDiscoveryViewModel) {
+    init(viewModel: MarketDiscoveryViewModel, sortHeaderViewModel: MarketSingleSortHeaderViewModel) {
         self.viewModel = viewModel
+        headerView = MarketSingleSortHeaderView(viewModel: sortHeaderViewModel)
 
         super.init(scrollViews: [collectionView, tableView])
 
@@ -35,9 +42,17 @@ class MarketDiscoveryViewController: ThemeSearchViewController {
         title = "market_discovery.title".localized
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "market_discovery.filters".localized, style: .plain, target: self, action: #selector(onTapFilters))
 
+        view.addSubview(headerView)
+        headerView.snp.makeConstraints { maker in
+            maker.top.equalTo(view.safeAreaLayoutGuide)
+            maker.leading.trailing.equalToSuperview()
+            maker.height.equalTo(MarketSingleSortHeaderView.height)
+        }
+
         view.addSubview(collectionView)
         collectionView.snp.makeConstraints { maker in
-            maker.edges.equalToSuperview()
+            maker.top.equalTo(headerView.snp.bottom)
+            maker.leading.trailing.bottom.equalToSuperview()
         }
 
         collectionView.backgroundColor = .clear
@@ -47,20 +62,53 @@ class MarketDiscoveryViewController: ThemeSearchViewController {
         collectionView.register(MarketDiscoveryCell.self, forCellWithReuseIdentifier: String(describing: MarketDiscoveryCell.self))
         collectionView.register(MarketDiscoveryTitleCell.self, forCellWithReuseIdentifier: String(describing: MarketDiscoveryTitleCell.self))
 
+        view.addSubview(spinner)
+        spinner.snp.makeConstraints { maker in
+            maker.center.equalToSuperview()
+        }
+        spinner.startAnimating()
+
+        view.addSubview(errorView)
+        errorView.snp.makeConstraints { maker in
+            maker.edges.equalTo(view.safeAreaLayoutGuide)
+        }
+
+        errorView.configureSyncError(action: { [weak self] in self?.onRetry() })
+
         view.addSubview(tableView)
         tableView.snp.makeConstraints { maker in
             maker.edges.equalToSuperview()
         }
 
-        tableView.registerCell(forClass: G4Cell.self)
         tableView.sectionDataSource = self
 
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
         tableView.keyboardDismissMode = .interactive
 
+        view.addSubview(notFoundPlaceholder)
+        notFoundPlaceholder.snp.makeConstraints { maker in
+            maker.edges.equalTo(view.safeAreaLayoutGuide)
+        }
+
+        notFoundPlaceholder.image = UIImage(named: "not_found_48")
+        notFoundPlaceholder.text = "market_discovery.not_found".localized
+
         subscribe(disposeBag, viewModel.discoveryViewItemsDriver) { [weak self] in self?.sync(discoveryViewItems: $0) }
         subscribe(disposeBag, viewModel.searchViewItemsDriver) { [weak self] in self?.sync(searchViewItems: $0) }
+        subscribe(disposeBag, viewModel.discoveryLoadingDriver) { [weak self] loading in
+            self?.spinner.isHidden = !loading
+            if loading {
+                self?.spinner.startAnimating()
+            } else {
+                self?.spinner.stopAnimating()
+            }
+        }
+        subscribe(disposeBag, viewModel.discoveryErrorDriver) { [weak self] in self?.errorView.isHidden = $0 == nil }
+
+        subscribe(disposeBag, viewModel.favoritedDriver) { HudHelper.instance.show(banner: .addedToWatchlist) }
+        subscribe(disposeBag, viewModel.unfavoritedDriver) { HudHelper.instance.show(banner: .removedFromWatchlist) }
+        subscribe(disposeBag, viewModel.failDriver) { HudHelper.instance.show(banner: .error(string: "alert.unknown_error".localized)) }
 
         isLoaded = true
     }
@@ -75,8 +123,10 @@ class MarketDiscoveryViewController: ThemeSearchViewController {
             self.discoveryViewItems = discoveryViewItems
             collectionView.reloadData()
             collectionView.isHidden = false
+            headerView.isHidden = false
         } else {
             collectionView.isHidden = true
+            headerView.isHidden = true
         }
     }
 
@@ -85,9 +135,15 @@ class MarketDiscoveryViewController: ThemeSearchViewController {
             self.searchViewItems = searchViewItems
             reloadTable()
             tableView.isHidden = false
+            notFoundPlaceholder.isHidden = !searchViewItems.isEmpty
         } else {
             tableView.isHidden = true
+            notFoundPlaceholder.isHidden = true
         }
+    }
+
+    @objc private func onRetry() {
+        viewModel.refresh()
     }
 
     override func onUpdate(filter: String?) {
@@ -168,10 +224,8 @@ extension MarketDiscoveryViewController: UICollectionViewDelegate {
         case .topCoins:
             let viewController = MarketTopModule.viewController()
             present(viewController, animated: true)
-        case .category(let uid):
-            guard let viewController = MarketCategoryModule.viewController(categoryUid: uid) else {
-                return
-            }
+        case .category(let category):
+            let viewController = MarketCategoryModule.viewController(category: category)
             present(viewController, animated: true)
         }
     }
@@ -183,7 +237,7 @@ extension MarketDiscoveryViewController: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         indexPath.section == 0 ?
                 CGSize(width: collectionView.width, height: .heightSingleLineCell) :
-                CGSize(width: (collectionView.width - .margin16 * 2 - .margin12) / 2, height: 128)
+                CGSize(width: (collectionView.width - .margin16 * 2 - .margin12) / 2, height: MarketDiscoveryCell.cellHeight)
     }
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
@@ -213,19 +267,35 @@ extension MarketDiscoveryViewController: SectionsDataSource {
                     rows: searchViewItems.enumerated().map { index, viewItem in
                         let isLast = index == searchViewItems.count - 1
 
-                        return Row<G4Cell>(
+                        return CellBuilderNew.row(
+                                rootElement: .hStack([
+                                    .image24 { component in
+                                        component.setImage(urlString: viewItem.imageUrl, placeholder: UIImage(named: viewItem.placeholderImageName))
+                                    },
+                                    .vStackCentered([
+                                        .text { component in
+                                            component.font = .body
+                                            component.textColor = .themeLeah
+                                            component.text = viewItem.name
+                                        },
+                                        .margin(3),
+                                        .text { component in
+                                            component.font = .subhead2
+                                            component.textColor = .themeGray
+                                            component.text = viewItem.code
+                                        }
+                                    ])
+                                ]),
+                                tableView: tableView,
                                 id: "coin_\(viewItem.uid)",
                                 hash: "\(viewItem.favorite)",
                                 height: .heightDoubleLineCell,
                                 autoDeselect: true,
                                 rowActionProvider: { [weak self] in self?.rowActions(index: index) ?? [] },
-                                bind: { cell, _ in
+                                bind: { cell in
                                     cell.set(backgroundStyle: .transparent, isLast: isLast)
-                                    cell.setTitleImage(urlString: viewItem.imageUrl, placeholder: UIImage(named: viewItem.placeholderImageName))
-                                    cell.title = viewItem.name
-                                    cell.subtitle = viewItem.code
                                 },
-                                action: { [weak self] _ in
+                                action: { [weak self] in
                                     self?.onSelect(viewItem: viewItem)
                                 }
                         )

@@ -1,34 +1,22 @@
 import Foundation
-import EthereumKit
+import EvmKit
 
 class AccountFactory {
-    private let accountManager: IAccountManager
+    private let accountManager: AccountManager
 
-    init(accountManager: IAccountManager) {
+    init(accountManager: AccountManager) {
         self.accountManager = accountManager
     }
 
     private var nextAccountName: String {
-        let nonWatchAccounts = accountManager.accounts.filter { account in
-            switch account.type {
-            case .address: return false
-            default: return true
-            }
-        }
-
+        let nonWatchAccounts = accountManager.accounts.filter { !$0.watchAccount }
         let order = nonWatchAccounts.count + 1
 
         return "Wallet \(order)"
     }
 
     private var nextWatchAccountName: String {
-        let watchAccounts = accountManager.accounts.filter { account in
-            switch account.type {
-            case .address: return true
-            default: return false
-            }
-        }
-
+        let watchAccounts = accountManager.accounts.filter { $0.watchAccount }
         let order = watchAccounts.count + 1
 
         return "Watch Wallet \(order)"
@@ -48,11 +36,11 @@ extension AccountFactory {
         )
     }
 
-    func watchAccount(address: EthereumKit.Address, domain: String?) -> Account {
+    func watchAccount(type: AccountType, name: String?) -> Account {
         Account(
                 id: UUID().uuidString,
-                name: domain ?? nextWatchAccountName,
-                type: .address(address: address),
+                name: name ?? nextWatchAccountName,
+                type: type,
                 origin: .restored,
                 backedUp: true
         )

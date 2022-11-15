@@ -1,4 +1,5 @@
-import EthereumKit
+import Foundation
+import EvmKit
 
 class WalletConnectSignMessageRequestService {
     private let request: WalletConnectSignMessageRequest
@@ -26,12 +27,13 @@ extension WalletConnectSignMessageRequestService {
     var message: String {
         switch request.payload {
         case let .sign(data, _):
-            return String(decoding: data, as: UTF8.self)
+            return String(data: data, encoding: .utf8) ?? data.hs.hexString
         case let .personalSign(data, _):
-            return String(decoding: data, as: UTF8.self)
+            return String(data: data, encoding: .utf8) ?? data.hs.hexString
         case let .signTypeData(_, data, _):
-            guard let object = try? JSONSerialization.jsonObject(with: data, options: []),
-            let prettyData = try? JSONSerialization.data(withJSONObject: object, options: .prettyPrinted) else {
+            guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let message = object["message"],
+                  let prettyData = try? JSONSerialization.data(withJSONObject: message, options: .prettyPrinted) else {
                 return ""
             }
 
@@ -41,8 +43,8 @@ extension WalletConnectSignMessageRequestService {
 
     var domain: String? {
         if case let .signTypeData(_, data, _) = request.payload {
-            let typeData = try? signer.parseTypedData(rawJson: data)
-            if case let .object(json) = typeData?.domain, let domainJson = json["name"], case let .string(domainString) = domainJson {
+            let typedData = try? signer.parseTypedData(rawJson: data)
+            if let domain = typedData?.domain.objectValue, let domainString = domain["name"]?.stringValue {
                 return domainString
             }
         }

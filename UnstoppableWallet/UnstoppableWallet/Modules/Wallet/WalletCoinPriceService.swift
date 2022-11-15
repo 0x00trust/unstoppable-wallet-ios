@@ -1,15 +1,16 @@
+import Foundation
 import RxSwift
 import RxRelay
 import CurrencyKit
 import MarketKit
 
-protocol IWalletRateServiceDelegate: AnyObject {
+protocol IWalletCoinPriceServiceDelegate: AnyObject {
     func didUpdateBaseCurrency()
     func didUpdate(itemsMap: [String: WalletCoinPriceService.Item])
 }
 
 class WalletCoinPriceService {
-    weak var delegate: IWalletRateServiceDelegate?
+    weak var delegate: IWalletCoinPriceServiceDelegate?
 
     private let currencyKit: CurrencyKit.Kit
     private let marketKit: MarketKit.Kit
@@ -59,21 +60,38 @@ class WalletCoinPriceService {
         )
     }
 
+    private func filteredIds(tokens: [Token]) -> Set<String> {
+        var uids = Set<String>()
+
+        for token in tokens {
+            if !token.isCustom {
+                uids.insert(token.coin.uid)
+            }
+        }
+
+        return uids
+    }
+
 }
 
 extension WalletCoinPriceService {
 
-    func set(coinUids: Set<String>) {
-        guard self.coinUids != coinUids else {
+    func set(tokens: Set<Token>) {
+        let filteredIds = filteredIds(tokens: Array(tokens))
+        guard coinUids != filteredIds else {
             return
         }
 
-        self.coinUids = coinUids
+        coinUids = filteredIds
         subscribeToCoinPrices()
     }
 
-    func itemMap(coinUids: [String]) -> [String: Item] {
-        marketKit.coinPriceMap(coinUids: coinUids, currencyCode: currency.code).mapValues { item(coinPrice: $0) }
+    func itemMap(tokens: [Token]) -> [String: Item] {
+        return marketKit.coinPriceMap(coinUids: Array(filteredIds(tokens: tokens)), currencyCode: currency.code).mapValues { item(coinPrice: $0) }
+    }
+
+    func item(token: Token) -> Item? {
+        marketKit.coinPrice(coinUid: token.coin.uid, currencyCode: currency.code).map { item(coinPrice: $0) }
     }
 
     func refresh() {

@@ -1,3 +1,4 @@
+import Foundation
 import RxSwift
 import RxRelay
 import RxCocoa
@@ -50,6 +51,10 @@ extension AboutViewModel {
 
     var releaseNotesUrl: URL? {
         releaseNotesService.lastVersionUrl
+    }
+
+    var twitterAccount: String {
+        service.twitterAccount
     }
 
     func onTapGithubLink() {

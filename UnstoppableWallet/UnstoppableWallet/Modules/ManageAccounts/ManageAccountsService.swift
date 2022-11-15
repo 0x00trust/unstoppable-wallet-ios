@@ -2,7 +2,7 @@ import RxSwift
 import RxRelay
 
 class ManageAccountsService {
-    private let accountManager: IAccountManager
+    private let accountManager: AccountManager
     private let disposeBag = DisposeBag()
 
     private let itemsRelay = PublishRelay<[Item]>()
@@ -12,7 +12,7 @@ class ManageAccountsService {
         }
     }
 
-    init(accountManager: IAccountManager) {
+    init(accountManager: AccountManager) {
         self.accountManager = accountManager
 
         subscribe(disposeBag, accountManager.accountsObservable) { [weak self] _ in self?.syncItems() }
@@ -34,6 +34,14 @@ extension ManageAccountsService {
 
     var itemsObservable: Observable<[Item]> {
         itemsRelay.asObservable()
+    }
+
+    var lastCreatedAccount: Account? {
+        accountManager.popLastCreatedAccount()
+    }
+
+    var hasAccounts: Bool {
+        !accountManager.accounts.isEmpty
     }
 
     func set(activeAccountId: String) {

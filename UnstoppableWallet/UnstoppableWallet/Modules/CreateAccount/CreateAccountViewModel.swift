@@ -1,20 +1,36 @@
 import RxSwift
 import RxRelay
 import RxCocoa
+import HdWalletKit
 
 class CreateAccountViewModel {
     private let service: CreateAccountService
     private let disposeBag = DisposeBag()
 
+    private let wordCountRelay = BehaviorRelay<String>(value: "")
+    private let wordListRelay = BehaviorRelay<String>(value: "")
     private let passphraseCautionRelay = BehaviorRelay<Caution?>(value: nil)
     private let passphraseConfirmationCautionRelay = BehaviorRelay<Caution?>(value: nil)
     private let clearInputsRelay = PublishRelay<Void>()
-    private let openSelectKindRelay = PublishRelay<[AlertViewItem]>()
     private let showErrorRelay = PublishRelay<String>()
     private let finishRelay = PublishRelay<()>()
 
     init(service: CreateAccountService) {
         self.service = service
+
+        subscribe(disposeBag, service.wordCountObservable) { [weak self] in self?.sync(wordCount: $0) }
+        subscribe(disposeBag, service.wordListObservable) { [weak self] in self?.sync(wordList: $0) }
+
+        sync(wordCount: service.wordCount)
+        sync(wordList: service.wordList)
+    }
+
+    private func sync(wordCount: Mnemonic.WordCount) {
+        wordCountRelay.accept(title(wordCount: wordCount))
+    }
+
+    private func sync(wordList: Mnemonic.Language) {
+        wordListRelay.accept(service.displayName(wordList: wordList))
     }
 
     private func clearInputs() {
@@ -35,12 +51,20 @@ class CreateAccountViewModel {
         }
     }
 
+    private func title(wordCount: Mnemonic.WordCount) -> String {
+        "create_wallet.n_words".localized("\(wordCount.rawValue)")
+    }
+
 }
 
 extension CreateAccountViewModel {
 
-    var kindDriver: Driver<String?> {
-        service.kindObservable.map { $0.title }.asDriver(onErrorJustReturn: nil)
+    var wordCountDriver: Driver<String> {
+        wordCountRelay.asDriver()
+    }
+
+    var wordListDriver: Driver<String> {
+        wordListRelay.asDriver()
     }
 
     var inputsVisibleDriver: Driver<Bool> {
@@ -59,10 +83,6 @@ extension CreateAccountViewModel {
         clearInputsRelay.asSignal()
     }
 
-    var openSelectKindSignal: Signal<[AlertViewItem]> {
-        openSelectKindRelay.asSignal()
-    }
-
     var showErrorSignal: Signal<String> {
         showErrorRelay.asSignal()
     }
@@ -71,15 +91,24 @@ extension CreateAccountViewModel {
         finishRelay.asSignal()
     }
 
-    func onTapKind() {
-        let viewItems = service.allKinds.map { type in
-            AlertViewItem(text: type.title, selected: type == service.kind)
+    var wordCountViewItems: [AlertViewItem] {
+        Mnemonic.WordCount.allCases.map { wordCount in
+            AlertViewItem(text: title(wordCount: wordCount), selected: wordCount == service.wordCount)
         }
-        openSelectKindRelay.accept(viewItems)
     }
 
-    func onSelectKind(index: Int) {
-        service.setKind(index: index)
+    var wordListViewItems: [AlertViewItem] {
+        Mnemonic.Language.allCases.map { wordList in
+            AlertViewItem(text: service.displayName(wordList: wordList), selected: wordList == service.wordList)
+        }
+    }
+
+    func onSelectWordCount(index: Int) {
+        service.set(wordCount: Mnemonic.WordCount.allCases[index])
+    }
+
+    func onSelectWordList(index: Int) {
+        service.set(wordList: Mnemonic.Language.allCases[index])
     }
 
     func onTogglePassphrase(isOn: Bool) {
@@ -95,22 +124,6 @@ extension CreateAccountViewModel {
     func onChange(passphraseConfirmation: String) {
         service.passphraseConfirmation = passphraseConfirmation
         clearCautions()
-    }
-
-    func validatePassphrase(text: String?) -> Bool {
-        let validated = service.validate(text: text)
-        if !validated {
-            passphraseCautionRelay.accept(Caution(text: "create_wallet.error.forbidden_symbols".localized, type: .warning))
-        }
-        return validated
-    }
-
-    func validatePassphraseConfirmation(text: String?) -> Bool {
-        let validated = service.validate(text: text)
-        if !validated {
-            passphraseConfirmationCautionRelay.accept(Caution(text: "create_wallet.error.forbidden_symbols".localized, type: .warning))
-        }
-        return validated
     }
 
     func onTapCreate() {

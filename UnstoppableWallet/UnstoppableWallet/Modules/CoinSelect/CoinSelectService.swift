@@ -1,3 +1,4 @@
+import Foundation
 import RxSwift
 import RxRelay
 import MarketKit
@@ -5,10 +6,9 @@ import CurrencyKit
 
 class CoinSelectService {
     private let dex: SwapModule.Dex
-    private let coinManager: CoinManager
+    private let marketKit: MarketKit.Kit
     private let walletManager: WalletManager
     private let adapterManager: AdapterManager
-    private let marketKit: MarketKit.Kit
     private let currencyKit: CurrencyKit.Kit
     private let disposeBag = DisposeBag()
 
@@ -21,32 +21,23 @@ class CoinSelectService {
 
     private var filter: String = ""
 
-    init(dex: SwapModule.Dex, coinManager: CoinManager, walletManager: WalletManager, adapterManager: AdapterManager, marketKit: MarketKit.Kit, currencyKit: CurrencyKit.Kit) {
+    init(dex: SwapModule.Dex, marketKit: MarketKit.Kit, walletManager: WalletManager, adapterManager: AdapterManager, currencyKit: CurrencyKit.Kit) {
         self.dex = dex
-        self.coinManager = coinManager
+        self.marketKit = marketKit
         self.walletManager = walletManager
         self.adapterManager = adapterManager
-        self.marketKit = marketKit
         self.currencyKit = currencyKit
 
         syncItems()
     }
 
-    private func dexSupports(platformCoin: PlatformCoin) -> Bool {
-        dex.blockchain.supports(coinType: platformCoin.coinType)
-    }
-
-    private func platformType() -> PlatformType {
-        switch dex.blockchain {
-        case .ethereum: return .ethereum
-        case .binanceSmartChain: return .binanceSmartChain
-        case .polygon: return .polygon
-        }
+    private func dexSupports(token: Token) -> Bool {
+        token.blockchainType == dex.blockchainType
     }
 
     private func walletItems() -> [Item] {
-        let balanceCoins = walletManager.activeWallets.compactMap { wallet -> (platformCoin: PlatformCoin, balance: Decimal)? in
-            guard dexSupports(platformCoin: wallet.platformCoin) else {
+        let balanceCoins = walletManager.activeWallets.compactMap { wallet -> (token: Token, balance: Decimal)? in
+            guard dexSupports(token: wallet.token) else {
                 return nil
             }
 
@@ -60,23 +51,23 @@ class CoinSelectService {
                 return nil
             }
 
-            return (platformCoin: wallet.platformCoin, balance: adapter.balanceData.balance)
+            return (token: wallet.token, balance: adapter.balanceData.balance)
         }
 
-        return balanceCoins.map { platformCoin, balance -> Item in
-            let coinPrice: CoinPrice? = marketKit.coinPrice(coinUid: platformCoin.coin.uid, currencyCode: currencyKit.baseCurrency.code)
+        return balanceCoins.map { token, balance -> Item in
+            let coinPrice: CoinPrice? = marketKit.coinPrice(coinUid: token.coin.uid, currencyCode: currencyKit.baseCurrency.code)
             let rate: Decimal? = coinPrice.flatMap { $0.expired ? nil : $0.value }
 
-            return Item(platformCoin: platformCoin, balance: balance, rate: rate)
+            return Item(token: token, balance: balance, rate: rate)
         }
     }
 
     private func coinItems() -> [Item] {
         do {
-            let platformCoins = try coinManager.platformCoins(platformType: platformType(), filter: filter)
+            let tokens = try marketKit.tokens(blockchainType: dex.blockchainType, filter: filter)
 
-            return platformCoins.map { platformCoin in
-                Item(platformCoin: platformCoin, balance: nil, rate: nil)
+            return tokens.map { token in
+                Item(token: token, balance: nil, rate: nil)
             }
         } catch {
             return []
@@ -87,7 +78,7 @@ class CoinSelectService {
         let walletItems = walletItems()
 
         let coinItems = coinItems().filter { coinItem in
-            !walletItems.contains { $0.platformCoin == coinItem.platformCoin }
+            !walletItems.contains { $0.token == coinItem.token }
         }
 
         let allItems = walletItems + coinItems
@@ -107,36 +98,36 @@ class CoinSelectService {
             if !filter.isEmpty {
                 let filter = filter.lowercased()
 
-                let lhsExactCode = lhsItem.platformCoin.coin.code.lowercased() == filter
-                let rhsExactCode = rhsItem.platformCoin.coin.code.lowercased() == filter
+                let lhsExactCode = lhsItem.token.coin.code.lowercased() == filter
+                let rhsExactCode = rhsItem.token.coin.code.lowercased() == filter
 
                 if lhsExactCode != rhsExactCode {
                     return lhsExactCode
                 }
 
-                let lhsStartsWithCode = lhsItem.platformCoin.coin.code.lowercased().starts(with: filter)
-                let rhsStartsWithCode = rhsItem.platformCoin.coin.code.lowercased().starts(with: filter)
+                let lhsStartsWithCode = lhsItem.token.coin.code.lowercased().starts(with: filter)
+                let rhsStartsWithCode = rhsItem.token.coin.code.lowercased().starts(with: filter)
 
                 if lhsStartsWithCode != rhsStartsWithCode {
                     return lhsStartsWithCode
                 }
 
-                let lhsStartsWithName = lhsItem.platformCoin.coin.name.lowercased().starts(with: filter)
-                let rhsStartsWithName = rhsItem.platformCoin.coin.name.lowercased().starts(with: filter)
+                let lhsStartsWithName = lhsItem.token.coin.name.lowercased().starts(with: filter)
+                let rhsStartsWithName = rhsItem.token.coin.name.lowercased().starts(with: filter)
 
                 if lhsStartsWithName != rhsStartsWithName {
                     return lhsStartsWithName
                 }
             }
 
-            let lhsMarketCapRank = lhsItem.platformCoin.coin.marketCapRank ?? Int.max
-            let rhsMarketCapRank = rhsItem.platformCoin.coin.marketCapRank ?? Int.max
+            let lhsMarketCapRank = lhsItem.token.coin.marketCapRank ?? Int.max
+            let rhsMarketCapRank = rhsItem.token.coin.marketCapRank ?? Int.max
 
             if lhsMarketCapRank != rhsMarketCapRank {
                 return lhsMarketCapRank < rhsMarketCapRank
             }
 
-            return lhsItem.platformCoin.coin.name.lowercased() < rhsItem.platformCoin.coin.name.lowercased()
+            return lhsItem.token.coin.name.lowercased() < rhsItem.token.coin.name.lowercased()
         }
     }
 
@@ -163,7 +154,7 @@ extension CoinSelectService {
 extension CoinSelectService {
 
     struct Item {
-        let platformCoin: PlatformCoin
+        let token: Token
         let balance: Decimal?
         let rate: Decimal?
     }

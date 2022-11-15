@@ -6,14 +6,14 @@ import ComponentKit
 class AmountInputView: UIView {
     let viewHeight: CGFloat = 85
 
-    private let inputStackView = InputStackView()
+    private let inputStackView: InputStackView
     private let separatorView = UIView()
     private let secondaryButton = UIButton()
 
     private let prefixView = InputPrefixWrapperView()
     private let estimatedView = InputBadgeWrapperView()
-    private let maxView = InputButtonWrapperView(style: .secondaryDefault)
-    private let clearView = InputButtonWrapperView(style: .secondaryIcon)
+    private let maxView = InputSecondaryButtonWrapperView(style: .default)
+    private let clearView = InputSecondaryCircleButtonWrapperView()
     private let warningView = UILabel()
 
     var maxButtonVisible = false {
@@ -31,7 +31,8 @@ class AmountInputView: UIView {
     var onTapMax: (() -> ())?
     var onTapSecondary: (() -> ())?
 
-    init() {
+    init(singleLine: Bool = false) {
+        inputStackView = InputStackView(singleLine: singleLine)
         super.init(frame: .zero)
 
         backgroundColor = .clear
@@ -58,7 +59,7 @@ class AmountInputView: UIView {
 
         secondaryButton.titleLabel?.font = .subhead2
         secondaryButton.contentHorizontalAlignment = .leading
-        secondaryButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: .margin12, bottom: 0, right: .margin12)
+        secondaryButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: .margin16, bottom: 0, right: .margin16)
         secondaryButton.setTitleColor(.themeBran, for: .normal)
         secondaryButton.setTitleColor(.themeGray50, for: .disabled)
         secondaryButton.addTarget(self, action: #selector(onTapSecondaryButton), for: .touchUpInside)
@@ -81,20 +82,19 @@ class AmountInputView: UIView {
         maxView.button.setTitle("send.max_button".localized, for: .normal)
         maxView.onTapButton = { [weak self] in self?.onTapMax?() }
 
-        clearView.button.setImage(UIImage(named: "trash_20"), for: .normal)
+        clearView.button.set(image: UIImage(named: "trash_20"))
         clearView.onTapButton = { [weak self] in
             self?.inputStackView.text = nil
             self?.handleChange(text: nil)
         }
 
-        inputStackView.prependSubview(prefixView, customSpacing: 0)
+        inputStackView.prependSubview(prefixView, customSpacing: .margin4)
         inputStackView.appendSubview(estimatedView)
         inputStackView.appendSubview(maxView)
         inputStackView.appendSubview(clearView)
 
         inputStackView.placeholder = "0"
         inputStackView.keyboardType = .decimalPad
-        inputStackView.maximumNumberOfLines = 1
         inputStackView.onChangeText = { [weak self] text in
             self?.handleChange(text: text)
         }
@@ -149,6 +149,11 @@ extension AmountInputView {
     var textColor: UIColor? {
         get { inputStackView.textColor }
         set { inputStackView.textColor = newValue }
+    }
+
+    var font: UIFont? {
+        get { inputStackView.font }
+        set { inputStackView.font = newValue }
     }
 
     var prefix: String? {

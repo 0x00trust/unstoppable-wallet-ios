@@ -9,11 +9,8 @@ import HUD
 protocol IMarketListViewModel {
     var viewItemDataDriver: Driver<MarketModule.ListViewItemData?> { get }
     var loadingDriver: Driver<Bool> { get }
-    var errorDriver: Driver<String?> { get }
+    var syncErrorDriver: Driver<Bool> { get }
     var scrollToTopSignal: Signal<()> { get }
-    func isFavorite(index: Int) -> Bool?
-    func favorite(index: Int)
-    func unfavorite(index: Int)
     func refresh()
 }
 
@@ -23,7 +20,7 @@ class MarketListViewController: ThemeViewController {
 
     let tableView = SectionsTableView(style: .plain)
     private let spinner = HUDActivityView.create(with: .medium24)
-    private let errorView = MarketListErrorView()
+    private let errorView = PlaceholderViewModule.reachabilityView()
     private let refreshControl = UIRefreshControl()
 
     private var viewItems: [MarketModule.ListViewItem]?
@@ -38,6 +35,12 @@ class MarketListViewController: ThemeViewController {
         self.listViewModel = listViewModel
 
         super.init()
+
+        if let watchViewModel = listViewModel as? IMarketListWatchViewModel {
+            subscribe(disposeBag, watchViewModel.favoriteDriver) { [weak self] in self?.showAddedToWatchlist() }
+            subscribe(disposeBag, watchViewModel.unfavoriteDriver) { [weak self] in self?.showRemovedFromWatchlist() }
+            subscribe(disposeBag, watchViewModel.failDriver) { error in HudHelper.instance.show(banner: .error(string: error.localized)) }
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -63,13 +66,11 @@ class MarketListViewController: ThemeViewController {
         tableView.backgroundColor = .clear
 
         tableView.sectionDataSource = self
-        tableView.registerCell(forClass: G14Cell.self)
 
         if let emptyView = emptyView {
             view.addSubview(emptyView)
             emptyView.snp.makeConstraints { maker in
-                maker.leading.trailing.equalToSuperview().inset(CGFloat.margin48)
-                maker.centerY.equalToSuperview()
+                maker.edges.equalTo(view.safeAreaLayoutGuide)
             }
         }
 
@@ -82,22 +83,17 @@ class MarketListViewController: ThemeViewController {
 
         view.addSubview(errorView)
         errorView.snp.makeConstraints { maker in
-            maker.edges.equalToSuperview()
+            maker.edges.equalTo(view.safeAreaLayoutGuide)
         }
 
-        errorView.onTapRetry = { [weak self] in self?.refresh() }
+        errorView.configureSyncError(action: { [weak self] in self?.onRetry() })
 
         subscribe(disposeBag, listViewModel.viewItemDataDriver) { [weak self] in self?.sync(viewItemData: $0) }
         subscribe(disposeBag, listViewModel.loadingDriver) { [weak self] loading in
             self?.spinner.isHidden = !loading
         }
-        subscribe(disposeBag, listViewModel.errorDriver) { [weak self] error in
-            if let error = error {
-                self?.errorView.text = error
-                self?.errorView.isHidden = false
-            } else {
-                self?.errorView.isHidden = true
-            }
+        subscribe(disposeBag, listViewModel.syncErrorDriver) { [weak self] visible in
+            self?.errorView.isHidden = !visible
         }
         subscribe(disposeBag, listViewModel.scrollToTopSignal) { [weak self] in self?.scrollToTop() }
     }
@@ -110,8 +106,8 @@ class MarketListViewController: ThemeViewController {
         }
     }
 
-    func refresh() {
-        listViewModel.refresh()
+    @objc private func onRetry() {
+        refresh()
     }
 
     @objc private func onRefresh() {
@@ -120,6 +116,10 @@ class MarketListViewController: ThemeViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             self?.refreshControl.endRefreshing()
         }
+    }
+
+    private func refresh() {
+        listViewModel.refresh()
     }
 
     private func sync(viewItemData: MarketModule.ListViewItemData?) {
@@ -144,9 +144,9 @@ class MarketListViewController: ThemeViewController {
         }
     }
 
-    private func onSelect(viewItem: MarketModule.ListViewItem) {
+    func onSelect(viewItem: MarketModule.ListViewItem) {
         guard let uid = viewItem.uid, let module = CoinPageModule.viewController(coinUid: uid) else {
-            HudHelper.instance.showAttention(title: "market.coin_not_supported_yet".localized)
+            HudHelper.instance.show(banner: .attention(string: "market.project_has_no_coin".localized))
             return
         }
 
@@ -154,7 +154,11 @@ class MarketListViewController: ThemeViewController {
     }
 
     private func rowActions(index: Int) -> [RowAction] {
-        guard let isFavorite = listViewModel.isFavorite(index: index) else {
+        guard let watchListViewModel = listViewModel as? IMarketListWatchViewModel else {
+            return []
+        }
+
+        guard let isFavorite = watchListViewModel.isFavorite(index: index) else {
             return []
         }
 
@@ -165,14 +169,14 @@ class MarketListViewController: ThemeViewController {
         if isFavorite {
             type = .destructive
             iconName = "star_off_24"
-            action = { [weak self] _ in
-                self?.listViewModel.unfavorite(index: index)
+            action = { _ in
+                watchListViewModel.unfavorite(index: index)
             }
         } else {
             type = .additive
             iconName = "star_24"
-            action = { [weak self] _ in
-                self?.listViewModel.favorite(index: index)
+            action = { _ in
+                watchListViewModel.favorite(index: index)
             }
         }
 
@@ -188,27 +192,17 @@ class MarketListViewController: ThemeViewController {
         tableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .bottom, animated: true)
     }
 
+    func showAddedToWatchlist() {
+        HudHelper.instance.show(banner: .addedToWatchlist)
+    }
+
+    func showRemovedFromWatchlist() {
+        HudHelper.instance.show(banner: .removedFromWatchlist)
+    }
+
 }
 
 extension MarketListViewController: SectionsDataSource {
-
-    private func row(viewItem: MarketModule.ListViewItem, index: Int, isLast: Bool) -> RowProtocol {
-        Row<G14Cell>(
-                id: "\(viewItem.uid ?? "")-\(viewItem.name)",
-                hash: "\(viewItem.dataValue)-\(viewItem.price)-\(isLast)",
-                height: .heightDoubleLineCell,
-                autoDeselect: true,
-                rowActionProvider: { [weak self] in
-                    self?.rowActions(index: index) ?? []
-                },
-                bind: { cell, _ in
-                    cell.set(backgroundStyle: .transparent, isLast: isLast)
-                    MarketModule.bind(cell: cell, viewItem: viewItem)
-                },
-                action: { [weak self] _ in
-                    self?.onSelect(viewItem: viewItem)
-                })
-    }
 
     func buildSections() -> [SectionProtocol] {
         let headerState: ViewState<UITableViewHeaderFooterView>
@@ -225,7 +219,21 @@ extension MarketListViewController: SectionsDataSource {
                     headerState: headerState,
                     footerState: .marginColor(height: .margin32, color: .clear) ,
                     rows: viewItems.map { viewItems in
-                        viewItems.enumerated().map { row(viewItem: $1, index: $0, isLast: $0 == viewItems.count - 1) }
+                        viewItems.enumerated().map { index, viewItem in
+                            MarketModule.marketListCell(
+                                    tableView: tableView,
+                                    backgroundStyle: .transparent,
+                                    listViewItem: viewItem,
+                                    isFirst: false,
+                                    isLast: index == viewItems.count - 1,
+                                    rowActionProvider: { [weak self] in
+                                        self?.rowActions(index: index) ?? []
+                                    },
+                                    action: { [weak self] in
+                                        self?.onSelect(viewItem: viewItem)
+                                    }
+                            )
+                        }
                     } ?? []
             )
         ]

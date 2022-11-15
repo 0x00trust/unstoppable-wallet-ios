@@ -39,15 +39,20 @@ class MetricChartFactory {
 
         switch valueType {
         case .percent:         // values in percent
-            return ValueFormatter.instance.format(percentValue: value, signed: false)
+            return ValueFormatter.instance.format(percentValue: value, showSign: false)
         case .currencyValue:
-            return CurrencyCompactFormatter.instance.format(currency: currency, value: value)
+            return ValueFormatter.instance.formatFull(currency: currency, value: value)
+        case .counter:
+            if exactlyValue {
+                return value.description
+            } else {
+                return ValueFormatter.instance.formatShort(value: value)
+            }
         case .compactCurrencyValue:                   // others in compact forms
             if exactlyValue {
-                let currencyValue = CurrencyValue(currency: currency, value: value)
-                return ValueFormatter.instance.format(currencyValue: currencyValue)
+                return ValueFormatter.instance.formatFull(currency: currency, value: value)
             } else {
-                return CurrencyCompactFormatter.instance.format(currency: currency, value: value)
+                return ValueFormatter.instance.formatShort(currency: currency, value: value)
             }
         }
     }
@@ -91,7 +96,7 @@ extension MetricChartFactory {
                     ChartTimelineItem(text: timelineHelper.text(timestamp: $0, separateHourlyInterval: gridInterval, dateFormatter: dateFormatter), timestamp: $0)
                 }
 
-        return MetricChartViewModel.ViewItem(chartData: data, chartTrend: chartTrend, currentValue: value, minValue: minString, maxValue: maxString, chartDiff: valueDiff, timeline: timeline)
+        return MetricChartViewModel.ViewItem(currentValue: value, chartData: data, chartTrend: chartTrend, chartDiff: valueDiff, minValue: minString, maxValue: maxString, timeline: timeline, selectedIndicator: ChartIndicatorSet.none)
     }
 
     func selectedPointViewItem(chartItem: ChartItem, valueType: MetricChartModule.ValueType, currency: Currency) -> SelectedPointViewItem? {

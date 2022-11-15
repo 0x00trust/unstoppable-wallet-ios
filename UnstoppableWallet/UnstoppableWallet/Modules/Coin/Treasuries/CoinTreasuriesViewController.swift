@@ -1,3 +1,5 @@
+import Foundation
+import UIKit
 import RxSwift
 import RxCocoa
 import SnapKit
@@ -12,7 +14,7 @@ class CoinTreasuriesViewController: ThemeViewController {
 
     private let tableView = SectionsTableView(style: .plain)
     private let spinner = HUDActivityView.create(with: .medium24)
-    private let errorView = MarketListErrorView()
+    private let errorView = PlaceholderViewModule.reachabilityView()
 
     private var viewItems: [CoinTreasuriesViewModel.ViewItem]?
     private let headerView: DropdownSortHeaderView
@@ -48,7 +50,6 @@ class CoinTreasuriesViewController: ThemeViewController {
         tableView.backgroundColor = .clear
 
         tableView.sectionDataSource = self
-        tableView.registerCell(forClass: G14Cell.self)
         tableView.registerCell(forClass: BrandFooterCell.self)
 
         view.addSubview(spinner)
@@ -60,24 +61,23 @@ class CoinTreasuriesViewController: ThemeViewController {
 
         view.addSubview(errorView)
         errorView.snp.makeConstraints { maker in
-            maker.edges.equalToSuperview()
+            maker.edges.equalTo(view.safeAreaLayoutGuide)
         }
 
-        errorView.onTapRetry = { [weak self] in self?.viewModel.refresh() }
+        errorView.configureSyncError(action: { [weak self] in self?.onRetry() })
 
         subscribe(disposeBag, viewModel.viewItemsDriver) { [weak self] in self?.sync(viewItems: $0) }
         subscribe(disposeBag, viewModel.loadingDriver) { [weak self] loading in
             self?.spinner.isHidden = !loading
         }
-        subscribe(disposeBag, viewModel.errorDriver) { [weak self] error in
-            if let error = error {
-                self?.errorView.text = error
-                self?.errorView.isHidden = false
-            } else {
-                self?.errorView.isHidden = true
-            }
+        subscribe(disposeBag, viewModel.syncErrorDriver) { [weak self] visible in
+            self?.errorView.isHidden = !visible
         }
         subscribe(disposeBag, viewModel.scrollToTopSignal) { [weak self] in self?.scrollToTop() }
+    }
+
+    @objc private func onRetry() {
+        viewModel.onTapRetry()
     }
 
     private func sync(viewItems: [CoinTreasuriesViewModel.ViewItem]?) {
@@ -101,19 +101,49 @@ class CoinTreasuriesViewController: ThemeViewController {
 extension CoinTreasuriesViewController: SectionsDataSource {
 
     private func row(viewItem: CoinTreasuriesViewModel.ViewItem, index: Int, isLast: Bool) -> RowProtocol {
-        Row<G14Cell>(
+        CellBuilderNew.row(
+                rootElement: .hStack([
+                    .image24 { component in
+                        component.setImage(urlString: viewItem.logoUrl, placeholder: UIImage(named: "icon_placeholder_24"))
+                    },
+                    .vStackCentered([
+                        .hStack([
+                            .text { component in
+                                component.font = .body
+                                component.textColor = .themeLeah
+                                component.text = viewItem.fund
+                            },
+                            .text { component in
+                                component.font = .body
+                                component.textColor = .themeLeah
+                                component.textAlignment = .right
+                                component.setContentCompressionResistancePriority(.required, for: .horizontal)
+                                component.text = viewItem.amount
+                            }
+                        ]),
+                        .margin(3),
+                        .hStack([
+                            .text { component in
+                                component.font = .subhead2
+                                component.textColor = .themeGray
+                                component.text = viewItem.country
+                            },
+                            .text { component in
+                                component.setContentCompressionResistancePriority(.required, for: .horizontal)
+                                component.setContentHuggingPriority(.required, for: .horizontal)
+                                component.textAlignment = .right
+                                component.font = .subhead2
+                                component.textColor = .themeJacob
+                                component.text = viewItem.amountInCurrency
+                            }
+                        ])
+                    ])
+                ]),
+                tableView: tableView,
                 id: "treasury-\(index)",
                 height: .heightDoubleLineCell,
-                bind: { cell, _ in
+                bind: { cell in
                     cell.set(backgroundStyle: .transparent, isLast: isLast)
-
-                    cell.setTitleImage(urlString: viewItem.logoUrl, placeholder: UIImage(named: "icon_placeholder_24"))
-                    cell.topText = viewItem.fund
-                    cell.bottomText = viewItem.country
-
-                    cell.primaryValueText = viewItem.amount
-                    cell.secondaryValueText = viewItem.amountInCurrency
-                    cell.secondaryValueTextColor = .themeJacob
                 }
         )
     }

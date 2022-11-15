@@ -34,7 +34,7 @@ class ManageAccountsViewModel {
         ViewItem(
                 accountId: item.account.id,
                 title: item.account.name,
-                subtitle: item.account.type.description,
+                subtitle: item.account.type.detailedDescription,
                 selected: item.isActive,
                 alert: !item.account.backedUp,
                 watchAccount: item.account.watchAccount
@@ -55,6 +55,14 @@ extension ManageAccountsViewModel {
 
     var isDoneVisible: Bool {
         mode == .switcher
+    }
+
+    var lastCreatedAccount: Account? {
+        service.lastCreatedAccount
+    }
+
+    var shouldClose: Bool {
+        mode == .switcher && !service.hasAccounts
     }
 
     func onSelect(accountId: String) {

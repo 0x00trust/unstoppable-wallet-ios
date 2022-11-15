@@ -58,7 +58,7 @@ class SwapCoinCardCell: UITableViewCell {
 
         titleLabel.setContentHuggingPriority(.required, for: .horizontal)
         titleLabel.font = .body
-        titleLabel.textColor = .themeOz
+        titleLabel.textColor = .themeLeah
         titleLabel.text = title
 
         cardView.contentView.addSubview(paddingView)
@@ -96,8 +96,9 @@ class SwapCoinCardCell: UITableViewCell {
             maker.height.equalTo(formAmountInput.viewHeight)
         }
 
-        amountInputWrapper.layer.cornerRadius = .cornerRadius2x
-        amountInputWrapper.layer.borderWidth = CGFloat.heightOnePixel
+        amountInputWrapper.layer.cornerRadius = .cornerRadius8
+        amountInputWrapper.layer.cornerCurve = .continuous
+        amountInputWrapper.layer.borderWidth = .heightOnePixel
         amountInputWrapper.layer.borderColor = UIColor.themeSteel20.cgColor
 
         amountInputWrapper.addSubview(formAmountInput)
@@ -128,7 +129,7 @@ class SwapCoinCardCell: UITableViewCell {
 
     @objc private func onTapTokenSelect() {
         let viewController = CoinSelectModule.viewController(dex: viewModel.dex, delegate: self)
-        presentDelegate?.show(viewController: ThemeNavigationController(rootViewController: viewController))
+        presentDelegate?.present(viewController: ThemeNavigationController(rootViewController: viewController))
     }
 
 }
@@ -174,8 +175,8 @@ extension SwapCoinCardCell {
 
 extension SwapCoinCardCell: ICoinSelectDelegate {
 
-    func didSelect(platformCoin: PlatformCoin) {
-        viewModel.onSelect(platformCoin: platformCoin)
+    func didSelect(token: Token) {
+        viewModel.onSelect(token: token)
     }
 
 }

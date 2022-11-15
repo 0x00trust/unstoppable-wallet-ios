@@ -7,18 +7,20 @@ import HUD
 
 class CoinMarketsViewController: ThemeViewController {
     private let viewModel: CoinMarketsViewModel
+    private let urlManager: UrlManager
     private let disposeBag = DisposeBag()
 
     private let tableView = SectionsTableView(style: .plain)
     private let spinner = HUDActivityView.create(with: .medium24)
-    private let infoLabel = UILabel()
-    private let errorView = MarketListErrorView()
+    private let infoView = PlaceholderView()
+    private let errorView = PlaceholderViewModule.reachabilityView()
     private let headerView: MarketSingleSortHeaderView
 
     private var viewItems: [CoinMarketsViewModel.ViewItem]?
 
-    init(viewModel: CoinMarketsViewModel, headerViewModel: MarketSingleSortHeaderViewModel) {
+    init(viewModel: CoinMarketsViewModel, headerViewModel: MarketSingleSortHeaderViewModel, urlManager: UrlManager) {
         self.viewModel = viewModel
+        self.urlManager = urlManager
         headerView = MarketSingleSortHeaderView(viewModel: headerViewModel, hasTopSeparator: false)
 
         super.init()
@@ -51,7 +53,7 @@ class CoinMarketsViewController: ThemeViewController {
             maker.edges.equalToSuperview()
         }
 
-        errorView.onTapRetry = { [weak self] in self?.viewModel.onRefresh() }
+        errorView.configureSyncError(action: { [weak self] in self?.onRetry() })
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { maker in
@@ -61,23 +63,17 @@ class CoinMarketsViewController: ThemeViewController {
         if #available(iOS 15.0, *) {
             tableView.sectionHeaderTopPadding = 0
         }
-        tableView.allowsSelection = false
         tableView.separatorStyle = .none
         tableView.backgroundColor = .clear
 
         tableView.sectionDataSource = self
-        tableView.registerCell(forClass: G14Cell.self)
 
-        wrapperView.addSubview(infoLabel)
-        infoLabel.snp.makeConstraints { maker in
-            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin48)
-            maker.centerY.equalToSuperview()
+        wrapperView.addSubview(infoView)
+        infoView.snp.makeConstraints { maker in
+            maker.edges.equalToSuperview()
         }
 
-        infoLabel.textAlignment = .center
-        infoLabel.numberOfLines = 0
-        infoLabel.font = .subhead2
-        infoLabel.textColor = .themeGray
+        infoView.image = UIImage(named: "no_data_48")
 
         subscribe(disposeBag, viewModel.viewItemsDriver) { [weak self] in self?.sync(viewItems: $0) }
         subscribe(disposeBag, viewModel.loadingDriver) { [weak self] loading in
@@ -85,24 +81,23 @@ class CoinMarketsViewController: ThemeViewController {
         }
         subscribe(disposeBag, viewModel.infoDriver) { [weak self] info in
             if let info = info {
-                self?.infoLabel.text = info
-                self?.infoLabel.isHidden = false
+                self?.infoView.text = info
+                self?.infoView.isHidden = false
             } else {
-                self?.infoLabel.isHidden = true
+                self?.infoView.isHidden = true
             }
         }
 
-        subscribe(disposeBag, viewModel.errorDriver) { [weak self] error in
-            if let error = error {
-                self?.errorView.text = error
-                self?.errorView.isHidden = false
-            } else {
-                self?.errorView.isHidden = true
-            }
+        subscribe(disposeBag, viewModel.syncErrorDriver) { [weak self] visible in
+            self?.errorView.isHidden = !visible
         }
         subscribe(disposeBag, viewModel.scrollToTopSignal) { [weak self] in self?.scrollToTop() }
 
         viewModel.onLoad()
+    }
+
+    @objc private func onRetry() {
+        viewModel.onTapRetry()
     }
 
     private func sync(viewItems: [CoinMarketsViewModel.ViewItem]?) {
@@ -126,19 +121,57 @@ class CoinMarketsViewController: ThemeViewController {
 extension CoinMarketsViewController: SectionsDataSource {
 
     private func row(viewItem: CoinMarketsViewModel.ViewItem, index: Int, isLast: Bool) -> RowProtocol {
-        Row<G14Cell>(
+        CellBuilder.selectableRow(
+                elements: [.image24, .multiText, .multiText],
+                tableView: tableView,
                 id: "row-\(index)",
                 height: .heightDoubleLineCell,
-                bind: { cell, _ in
+                autoDeselect: true,
+                bind: { cell in
                     cell.set(backgroundStyle: .transparent, isLast: isLast)
-                    cell.setTitleImage(urlString: viewItem.marketImageUrl, placeholder: nil)
-                    cell.titleImageCornerRadius = .cornerRadius4
-                    cell.titleImageBackgroundColor = .themeSteel10
-                    cell.topText = viewItem.market
-                    cell.bottomText = viewItem.pair
-                    cell.primaryValueText = viewItem.rate
-                    cell.secondaryTitleText = "market.market_field.vol".localized
-                    cell.secondaryValueText = viewItem.volume
+                    cell.selectionStyle = viewItem.tradeUrl == nil ? .none : .default
+
+                    cell.bind(index: 0) { (component: ImageComponent) in
+                        component.setImage(urlString: viewItem.marketImageUrl, placeholder: UIImage(named: "placeholder_24"))
+                        component.imageView.cornerRadius = .cornerRadius4
+                        component.imageView.layer.cornerCurve = .continuous
+                    }
+                    cell.bind(index: 1) { (component: MultiTextComponent) in
+                        component.set(style: .m1)
+                        component.title.font = .body
+                        component.title.textColor = .themeLeah
+                        component.subtitle.font = .subhead2
+                        component.subtitle.textColor = .themeGray
+
+                        component.title.text = viewItem.market
+                        component.subtitle.text = viewItem.pair
+                    }
+                    cell.bind(index: 2) { (component: MultiTextComponent) in
+                        component.titleSpacingView.isHidden = true
+                        component.set(style: .m2)
+                        component.title.font = .body
+                        component.title.textColor = .themeLeah
+                        component.subtitleLeft.font = .subhead2
+                        component.subtitleLeft.textColor = .themeJacob
+                        component.subtitle.font = .subhead2
+                        component.subtitle.textColor = .themeGray
+
+                        component.title.textAlignment = .right
+                        component.title.text = viewItem.rate
+
+                        component.subtitleLeft.setContentHuggingPriority(.defaultLow, for: .horizontal)
+                        component.subtitleLeft.textAlignment = .right
+                        component.subtitleLeft.text = "market.market_field.vol".localized
+
+                        component.subtitleRight.setContentHuggingPriority(.required, for: .horizontal)
+                        component.subtitleRight.textAlignment = .right
+                        component.subtitleRight.text = viewItem.volume
+                    }
+                },
+                action: { [weak self] in
+                    if let url = viewItem.tradeUrl {
+                        self?.urlManager.open(url: url, from: self)
+                    }
                 }
         )
     }

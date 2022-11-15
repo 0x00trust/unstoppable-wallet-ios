@@ -2,16 +2,20 @@ import Foundation
 import MarketKit
 
 class AppStatusManager {
-    private let systemInfoManager: ISystemInfoManager
-    private let storage: IAppVersionStorage
-    private let logRecordManager: ILogRecordManager
-    private let accountManager: IAccountManager
+    private let systemInfoManager: SystemInfoManager
+    private let storage: AppVersionStorage
+    private let logRecordManager: LogRecordManager
+    private let accountManager: AccountManager
     private let walletManager: WalletManager
     private let adapterManager: AdapterManager
     private let restoreSettingsManager: RestoreSettingsManager
+    private let evmBlockchainManager: EvmBlockchainManager
+    private let binanceKitManager: BinanceKitManager
+    private let marketKit: MarketKit.Kit
 
-    init(systemInfoManager: ISystemInfoManager, storage: IAppVersionStorage, accountManager: IAccountManager,
-         walletManager: WalletManager, adapterManager: AdapterManager, logRecordManager: ILogRecordManager, restoreSettingsManager: RestoreSettingsManager) {
+    init(systemInfoManager: SystemInfoManager, storage: AppVersionStorage, accountManager: AccountManager,
+         walletManager: WalletManager, adapterManager: AdapterManager, logRecordManager: LogRecordManager, restoreSettingsManager: RestoreSettingsManager,
+         evmBlockchainManager: EvmBlockchainManager, binanceKitManager: BinanceKitManager, marketKit: MarketKit.Kit) {
         self.systemInfoManager = systemInfoManager
         self.storage = storage
         self.accountManager = accountManager
@@ -19,6 +23,19 @@ class AppStatusManager {
         self.adapterManager = adapterManager
         self.logRecordManager = logRecordManager
         self.restoreSettingsManager = restoreSettingsManager
+        self.evmBlockchainManager = evmBlockchainManager
+        self.binanceKitManager = binanceKitManager
+        self.marketKit = marketKit
+    }
+
+    private var marketLastSyncTimestamps: [(String, Any)] {
+        let syncInfo = marketKit.syncInfo()
+
+        return [
+            ("Coins", syncInfo.coinsTimestamp ?? "nil"),
+            ("Blockchains", syncInfo.blockchainsTimestamp ?? "nil"),
+            ("Tokens", syncInfo.tokensTimestamp ?? "nil")
+        ]
     }
 
     private var accountStatus: [(String, Any)] {
@@ -53,41 +70,27 @@ class AppStatusManager {
     private var blockchainStatus: [(String, Any)] {
         var status = [(String, Any)]()
 
-        var ethereumStatus: [(String, Any)]?
-        var binanceSmartChainStatus: [(String, Any)]?
-        var binanceStatus: [(String, Any)]?
-
         for wallet in walletManager.activeWallets {
-            guard let adapter = adapterManager.adapter(for: wallet) else {
-                continue
-            }
+            let blockchain = wallet.token.blockchain
 
-            switch wallet.coinType {
-            case .ethereum, .erc20:
-                if ethereumStatus == nil {
-                    ethereumStatus = adapter.statusInfo
-                }
-            case .binanceSmartChain, .bep20:
-                if binanceSmartChainStatus == nil {
-                    binanceSmartChainStatus = adapter.statusInfo
-                }
-            case .bep2:
-                if binanceStatus == nil {
-                    binanceStatus = adapter.statusInfo
+            switch blockchain.type {
+            case .bitcoin, .bitcoinCash, .litecoin, .dash, .zcash:
+                if let adapter = adapterManager.adapter(for: wallet) {
+                    status.append((blockchain.name, adapter.statusInfo))
                 }
             default:
-                status.append((wallet.coin.name, adapter.statusInfo))
+                ()
             }
         }
 
-        if let ethereumStatus = ethereumStatus {
-            status.append(("Ethereum", ethereumStatus))
+        for blockchain in evmBlockchainManager.allBlockchains {
+            if let evmKitWrapper = evmBlockchainManager.evmKitManager(blockchainType: blockchain.type).evmKitWrapper {
+                status.append((blockchain.name, evmKitWrapper.evmKit.statusInfo()))
+            }
         }
-        if let binanceSmartChainStatus = binanceSmartChainStatus {
-            status.append(("Binance Smart Chain", binanceSmartChainStatus))
-        }
-        if let binanceStatus = binanceStatus {
-            status.append(("Binance", binanceStatus))
+
+        if let binanceKit = binanceKitManager.binanceKit {
+            status.append(("Binance Chain", binanceKit.statusInfo))
         }
 
         return status
@@ -95,7 +98,7 @@ class AppStatusManager {
 
 }
 
-extension AppStatusManager: IAppStatusManager {
+extension AppStatusManager {
 
     var status: [(String, Any)] {
         [
@@ -107,6 +110,7 @@ extension AppStatusManager: IAppStatusManager {
             ]),
             ("App Log", logRecordManager.logsGroupedBy(context: "Send")),
             ("Version History", storage.appVersions.map { ($0.description, $0.date) }),
+            ("Market Last Sync Timestamps", marketLastSyncTimestamps),
             ("Wallets Status", accountStatus),
             ("Blockchains Status", blockchainStatus)
         ]

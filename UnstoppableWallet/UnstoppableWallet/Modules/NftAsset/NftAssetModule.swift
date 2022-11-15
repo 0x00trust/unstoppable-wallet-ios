@@ -1,21 +1,33 @@
 import UIKit
-import ThemeKit
+import LanguageKit
+import MarketKit
 
 struct NftAssetModule {
 
-    static func viewController(collectionUid: String, tokenId: String, imageRatio: CGFloat) -> UIViewController? {
-        let coinPriceService = WalletCoinPriceService(currencyKit: App.shared.currencyKit, marketKit: App.shared.marketKit)
+    static func viewController(providerCollectionUid: String, nftUid: NftUid) -> UIViewController {
+        let overviewController = NftAssetOverviewModule.viewController(providerCollectionUid: providerCollectionUid, nftUid: nftUid)
+        let activityController = NftActivityModule.viewController(eventListType: .asset(nftUid: nftUid), defaultEventType: nil)
 
-        guard let service = NftAssetService(collectionUid: collectionUid, tokenId: tokenId, nftManager: App.shared.nftManager, coinPriceService: coinPriceService) else {
-            return nil
+        return NftAssetViewController(
+                overviewController: overviewController,
+                activityController: activityController
+        )
+    }
+
+}
+
+extension NftAssetModule {
+
+    enum Tab: Int, CaseIterable {
+        case overview
+        case activity
+
+        var title: String {
+            switch self {
+            case .overview: return "nft_asset.tab.overview".localized
+            case .activity: return "nft_asset.tab.activity".localized
+            }
         }
-
-        coinPriceService.delegate = service
-
-        let viewModel = NftAssetViewModel(service: service)
-        let viewController = NftAssetViewController(viewModel: viewModel, urlManager: UrlManager(inApp: true), imageRatio: imageRatio)
-
-        return ThemeNavigationController(rootViewController: viewController)
     }
 
 }

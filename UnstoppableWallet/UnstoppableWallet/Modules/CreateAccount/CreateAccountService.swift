@@ -1,62 +1,65 @@
 import RxSwift
 import RxRelay
 import MarketKit
+import HdWalletKit
+import LanguageKit
 
 class CreateAccountService {
     private let accountFactory: AccountFactory
-    private let wordsManager: IWordsManager
-    private let accountManager: IAccountManager
+    private let predefinedBlockchainService: PredefinedBlockchainService
+    private let languageManager: LanguageManager
+    private let accountManager: AccountManager
     private let walletManager: WalletManager
-    private let passphraseValidator: PassphraseValidator
     private let marketKit: Kit
 
-    private let kindRelay = BehaviorRelay<CreateAccountModule.Kind>(value: .mnemonic12)
+    private let wordCountRelay = PublishRelay<Mnemonic.WordCount>()
+    private(set) var wordCount: Mnemonic.WordCount = .twelve {
+        didSet {
+            wordCountRelay.accept(wordCount)
+        }
+    }
+
+    private let wordListRelay = PublishRelay<Mnemonic.Language>()
+    private(set) var wordList: Mnemonic.Language = .english {
+        didSet {
+            wordListRelay.accept(wordList)
+        }
+    }
+
     private let passphraseEnabledRelay = BehaviorRelay<Bool>(value: false)
 
     var passphrase: String = ""
     var passphraseConfirmation: String = ""
 
-    init(accountFactory: AccountFactory, wordsManager: IWordsManager, accountManager: IAccountManager, walletManager: WalletManager, passphraseValidator: PassphraseValidator, marketKit: Kit) {
+    init(accountFactory: AccountFactory, predefinedBlockchainService: PredefinedBlockchainService, languageManager: LanguageManager, accountManager: AccountManager, walletManager: WalletManager, marketKit: Kit) {
         self.accountFactory = accountFactory
-        self.wordsManager = wordsManager
+        self.predefinedBlockchainService = predefinedBlockchainService
+        self.languageManager = languageManager
         self.accountManager = accountManager
         self.walletManager = walletManager
-        self.passphraseValidator = passphraseValidator
         self.marketKit = marketKit
     }
 
-    private func resolveAccountType() throws -> AccountType {
-        switch kind {
-        case .mnemonic12:
-            return try mnemonicAccountType(wordCount: 12)
-        case .mnemonic24:
-            return try mnemonicAccountType(wordCount: 24)
-        }
-    }
-
-    private func mnemonicAccountType(wordCount: Int) throws -> AccountType {
-        let words = try wordsManager.generateWords(count: wordCount)
-        return .mnemonic(words: words, salt: passphrase)
-    }
-
     private func activateDefaultWallets(account: Account) {
-        let defaultCoinTypes: [CoinType] = [.bitcoin, .ethereum, .binanceSmartChain, .polygon, .zcash]
+        let defaultBlockchainTypes: [BlockchainType] = [.bitcoin, .ethereum, .binanceSmartChain, .avalanche]
 
         var wallets = [Wallet]()
 
-        for coinType in defaultCoinTypes {
-            guard let platformCoin = try? marketKit.platformCoin(coinType: coinType) else {
+        for blockchainType in defaultBlockchainTypes {
+            guard let token = try? marketKit.token(query: TokenQuery(blockchainType: blockchainType, tokenType: .native)) else {
                 continue
             }
 
-            let defaultSettingsArray = coinType.defaultSettingsArray
+            predefinedBlockchainService.prepareNew(account: account, blockchainType: blockchainType)
+
+            let defaultSettingsArray = blockchainType.defaultSettingsArray(accountType: account.type)
 
             if defaultSettingsArray.isEmpty {
-                wallets.append(Wallet(platformCoin: platformCoin, account: account))
+                wallets.append(Wallet(token: token, account: account))
             } else {
                 for coinSettings in defaultSettingsArray {
-                    let configuredPlatformCoin = ConfiguredPlatformCoin(platformCoin: platformCoin, coinSettings: coinSettings)
-                    wallets.append(Wallet(configuredPlatformCoin: configuredPlatformCoin, account: account))
+                    let configuredToken = ConfiguredToken(token: token, coinSettings: coinSettings)
+                    wallets.append(Wallet(configuredToken: configuredToken, account: account))
                 }
             }
         }
@@ -64,16 +67,31 @@ class CreateAccountService {
         walletManager.save(wallets: wallets)
     }
 
+    private func language(wordList: Mnemonic.Language) -> String {
+        switch wordList {
+        case .english: return "en"
+        case .japanese: return "ja"
+        case .korean: return "ko"
+        case .spanish: return "es"
+        case .simplifiedChinese: return "zh-Hans"
+        case .traditionalChinese: return "zh-Hant"
+        case .french: return "fr"
+        case .italian: return "it"
+        case .czech: return "cs"
+        case .portuguese: return "pt"
+        }
+    }
+
 }
 
 extension CreateAccountService {
 
-    var kind: CreateAccountModule.Kind {
-        kindRelay.value
+    var wordCountObservable: Observable<Mnemonic.WordCount> {
+        wordCountRelay.asObservable()
     }
 
-    var kindObservable: Observable<CreateAccountModule.Kind> {
-        kindRelay.asObservable()
+    var wordListObservable: Observable<Mnemonic.Language> {
+        wordListRelay.asObservable()
     }
 
     var passphraseEnabled: Bool {
@@ -84,20 +102,20 @@ extension CreateAccountService {
         passphraseEnabledRelay.asObservable()
     }
 
-    var allKinds: [CreateAccountModule.Kind] {
-        CreateAccountModule.Kind.allCases
+    func displayName(wordList: Mnemonic.Language) -> String {
+        languageManager.displayName(language: language(wordList: wordList)) ?? "\(wordList)"
     }
 
-    func setKind(index: Int) {
-        kindRelay.accept(allKinds[index])
+    func set(wordCount: Mnemonic.WordCount) {
+        self.wordCount = wordCount
+    }
+
+    func set(wordList: Mnemonic.Language) {
+        self.wordList = wordList
     }
 
     func set(passphraseEnabled: Bool) {
         passphraseEnabledRelay.accept(passphraseEnabled)
-    }
-
-    func validate(text: String?) -> Bool {
-        passphraseValidator.validate(text: text)
     }
 
     func createAccount() throws {
@@ -111,11 +129,14 @@ extension CreateAccountService {
             }
         }
 
-        let accountType = try resolveAccountType()
+        let words = try Mnemonic.generate(wordCount: wordCount, language: wordList)
+        let accountType: AccountType = .mnemonic(words: words, salt: passphrase)
         let account = accountFactory.account(type: accountType, origin: .created)
 
         accountManager.save(account: account)
         activateDefaultWallets(account: account)
+
+        accountManager.set(lastCreatedAccount: account)
     }
 
 }

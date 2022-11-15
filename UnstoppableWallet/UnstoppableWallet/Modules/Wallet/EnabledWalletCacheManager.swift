@@ -1,10 +1,10 @@
 import RxSwift
 
 class EnabledWalletCacheManager {
-    private let storage: IEnabledWalletCacheStorage
+    private let storage: EnabledWalletCacheStorage
     private let disposeBag = DisposeBag()
 
-    init(storage: IEnabledWalletCacheStorage, accountManager: IAccountManager) {
+    init(storage: EnabledWalletCacheStorage, accountManager: AccountManager) {
         self.storage = storage
 
         subscribe(disposeBag, accountManager.accountDeletedObservable) { [weak self] in self?.handleDelete(account: $0) }
@@ -46,7 +46,7 @@ extension EnabledWalletCacheManager {
         }
 
         func balanceData(wallet: Wallet) -> BalanceData? {
-            caches.first { $0.coinId == wallet.coinType.id && $0.coinSettingsId == wallet.coinSettings.id }?.balanceData
+            caches.first { $0.tokenQueryId == wallet.token.tokenQuery.id && $0.coinSettingsId == wallet.coinSettings.id }?.balanceData
         }
     }
 

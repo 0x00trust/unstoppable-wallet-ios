@@ -12,7 +12,9 @@ class WalletConnectListViewController: ThemeViewController {
     private let listViewV1: WalletConnectV1ListView
     private let listViewV2: WalletConnectV2ListView
 
-    private let emptyView = ErrorMessageView()
+    private let emptyView = PlaceholderView()
+    private let bottomButtonHolder = BottomGradientHolder()
+    private let bottomButton = PrimaryButton()
 
     let tableView = SectionsTableView(style: .grouped)
     private weak var scanQrViewController: WalletConnectScanQrViewController?
@@ -40,27 +42,36 @@ class WalletConnectListViewController: ThemeViewController {
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { maker in
-            maker.edges.equalToSuperview()
+            maker.leading.top.trailing.equalToSuperview()
         }
 
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
 
-        tableView.registerCell(forClass: A1Cell.self)
-        tableView.registerCell(forClass: G1Cell.self)
-        tableView.registerHeaderFooter(forClass: SubtitleHeaderFooterView.self)
-        tableView.registerHeaderFooter(forClass: BottomDescriptionHeaderFooterView.self)
         tableView.sectionDataSource = self
 
         view.addSubview(emptyView)
         emptyView.snp.makeConstraints { maker in
-            maker.edges.equalToSuperview()
+            maker.edges.equalTo(view.safeAreaLayoutGuide)
         }
 
-        emptyView.text = "wallet_connect.list.empty_view_text".localized
-        emptyView.setButton(title: "wallet_connect.list.empty_view_button_text".localized)
         emptyView.image = UIImage(named: "wallet_connect_48")
-        emptyView.onTapButton = { [weak self] in self?.startNewConnection() }
+        emptyView.text = "wallet_connect.list.empty_view_text".localized
+
+        view.addSubview(bottomButtonHolder)
+        bottomButtonHolder.snp.makeConstraints { maker in
+            maker.top.equalTo(tableView.snp.bottom).offset(-CGFloat.margin16)
+            maker.leading.trailing.bottom.equalToSuperview()
+        }
+
+        bottomButtonHolder.addSubview(bottomButton)
+        bottomButton.snp.makeConstraints { maker in
+            maker.edges.equalToSuperview().inset(CGFloat.margin24)
+        }
+
+        bottomButton.set(style: .yellow)
+        bottomButton.setTitle("wallet_connect_list.new_connection".localized, for: .normal)
+        bottomButton.addTarget(self, action: #selector(startNewConnection), for: .touchUpInside)
 
         subscribe(disposeBag, viewModel.showWalletConnectMainModuleSignal) { [weak self] in self?.show(walletConnectMainModule: $0) }
         subscribe(disposeBag, viewModel.newConnectionErrorSignal) { [weak self] in self?.show(newConnectionError: $0) }
@@ -116,7 +127,7 @@ class WalletConnectListViewController: ThemeViewController {
 extension WalletConnectListViewController: SectionsDataSource {
 
     func buildSections() -> [SectionProtocol] {
-        (listViewV2.sections + listViewV1.sections).compactMap { $0 }
+        (listViewV2.sections(tableView: tableView) + listViewV1.sections(tableView: tableView)).compactMap { $0 }
     }
 
 }

@@ -17,8 +17,8 @@ class WalletViewController: ThemeViewController {
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let refreshControl = UIRefreshControl()
 
-    private let emptyView = UIView()
-    private let watchEmptyView = UIView()
+    private let emptyView = PlaceholderView()
+    private let watchEmptyView = PlaceholderView()
 
     private var viewItems = [BalanceViewItem]()
     private var headerViewItem: WalletViewModel.HeaderViewItem?
@@ -72,50 +72,25 @@ class WalletViewController: ThemeViewController {
 
         view.addSubview(emptyView)
         emptyView.snp.makeConstraints { maker in
-            maker.leading.trailing.equalToSuperview()
-            maker.centerY.equalToSuperview()
+            maker.edges.equalTo(view.safeAreaLayoutGuide)
         }
 
-        let cautionView = CircleCautionView()
-
-        emptyView.addSubview(cautionView)
-        cautionView.snp.makeConstraints { maker in
-            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin48)
-            maker.top.equalToSuperview()
-        }
-
-        cautionView.image = UIImage(named: "add_to_wallet_2_48")
-        cautionView.text = "balance.empty.description".localized
-
-        let addCoinButton = ThemeButton()
-
-        emptyView.addSubview(addCoinButton)
-        addCoinButton.snp.makeConstraints { maker in
-            maker.centerX.equalToSuperview()
-            maker.top.equalTo(cautionView.snp.bottom).offset(CGFloat.margin32)
-            maker.bottom.equalToSuperview()
-        }
-
-        addCoinButton.apply(style: .secondaryDefault)
-        addCoinButton.setTitle("balance.empty.add_coins".localized, for: .normal)
-        addCoinButton.addTarget(self, action: #selector(onTapAddCoin), for: .touchUpInside)
+        emptyView.image = UIImage(named: "add_to_wallet_2_48")
+        emptyView.text = "balance.empty.description".localized
+        emptyView.addPrimaryButton(
+                style: .yellow,
+                title: "balance.empty.add_coins".localized,
+                target: self,
+                action: #selector(onTapAddCoin)
+        )
 
         view.addSubview(watchEmptyView)
         watchEmptyView.snp.makeConstraints { maker in
-            maker.leading.trailing.equalToSuperview()
-            maker.centerY.equalToSuperview()
+            maker.edges.equalTo(view.safeAreaLayoutGuide)
         }
 
-        let watchCautionView = CircleCautionView()
-
-        watchEmptyView.addSubview(watchCautionView)
-        watchCautionView.snp.makeConstraints { maker in
-            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin48)
-            maker.top.bottom.equalToSuperview()
-        }
-
-        watchCautionView.image = UIImage(named: "empty_wallet_48")
-        watchCautionView.text = "balance.watch_empty.description".localized
+        watchEmptyView.image = UIImage(named: "empty_wallet_48")
+        watchEmptyView.text = "balance.watch_empty.description".localized
 
         subscribe(disposeBag, viewModel.titleDriver) { [weak self] in self?.navigationItem.title = $0 }
         subscribe(disposeBag, viewModel.displayModeDriver) { [weak self] in self?.sync(displayMode: $0) }
@@ -125,7 +100,7 @@ class WalletViewController: ThemeViewController {
         subscribe(disposeBag, viewModel.openReceiveSignal) { [weak self] in self?.openReceive(wallet: $0) }
         subscribe(disposeBag, viewModel.openBackupRequiredSignal) { [weak self] in self?.openBackupRequired(wallet: $0) }
         subscribe(disposeBag, viewModel.openCoinPageSignal) { [weak self] in self?.openCoinPage(coin: $0) }
-        subscribe(disposeBag, viewModel.showErrorSignal) { [weak self] in self?.show(error: $0) }
+        subscribe(disposeBag, viewModel.noConnectionErrorSignal) { HudHelper.instance.show(banner: .noInternet) }
         subscribe(disposeBag, viewModel.openSyncErrorSignal) { [weak self] in self?.openSyncError(wallet: $0, error: $1) }
         subscribe(disposeBag, viewModel.showAccountsLostSignal) { [weak self] in self?.showAccountsLost() }
         subscribe(disposeBag, viewModel.playHapticSignal) { [weak self] in self?.playHaptic() }
@@ -140,6 +115,7 @@ class WalletViewController: ThemeViewController {
         tableView.refreshControl = refreshControl
 
         viewModel.onAppear()
+        showBackupPromptIfRequired()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -157,12 +133,16 @@ class WalletViewController: ThemeViewController {
     }
 
     @objc private func onTapSwitchWallet() {
-        let viewController = ManageAccountsModule.viewController(mode: .switcher)
+        let viewController = ManageAccountsModule.viewController(mode: .switcher, createAccountListener: self)
         present(ThemeNavigationController(rootViewController: viewController), animated: true)
     }
 
     @objc private func onTapNft() {
-        navigationController?.pushViewController(NftCollectionsModule.viewController(), animated: true)
+        guard let module = NftModule.viewController() else {
+            return
+        }
+
+        navigationController?.pushViewController(module, animated: true)
     }
 
     @objc private func onTapAddCoin() {
@@ -277,6 +257,7 @@ class WalletViewController: ThemeViewController {
             headerView.bind(viewItem: viewItem, sortBy: sortBy)
 
             headerView.onTapAmount = { [weak self] in self?.viewModel.onTapTotalAmount() }
+            headerView.onTapConvertedAmount = { [weak self] in self?.viewModel.onTapConvertedTotalAmount() }
             headerView.onTapSortBy = { [weak self] in self?.openSortType() }
             headerView.onTapAddCoin = { [weak self] in self?.openManageWallets() }
         }
@@ -300,13 +281,13 @@ class WalletViewController: ThemeViewController {
     }
 
     private func openSend(wallet: Wallet) {
-        if let module = SendRouter.module(wallet: wallet) {
+        if let module = SendModule.controller(wallet: wallet) {
             present(module, animated: true)
         }
     }
 
     private func openSwap(wallet: Wallet) {
-        if let module = SwapModule.viewController(platformCoinFrom: wallet.platformCoin) {
+        if let module = SwapModule.viewController(tokenFrom: wallet.token) {
             present(module, animated: true)
         }
     }
@@ -318,18 +299,25 @@ class WalletViewController: ThemeViewController {
     }
 
     private func openBackupRequired(wallet: Wallet) {
-        let text = "receive_alert.not_backed_up_description".localized(wallet.account.name, wallet.coin.name)
-        let module = BackupRequiredViewController(account: wallet.account, text: text, sourceViewController: self).toBottomSheet
-        present(module, animated: true)
-    }
+        let viewController = InformationModule.simpleInfo(
+                title: "backup_required.title".localized,
+                image: UIImage(named: "warning_2_24")?.withTintColor(.themeJacob),
+                description: "receive_alert.not_backed_up_description".localized(wallet.account.name, wallet.coin.name),
+                buttonTitle: "settings_manage_keys.backup".localized,
+                onTapButton: InformationModule.afterClose { [weak self] in
+                    guard let viewController = BackupModule.viewController(account: wallet.account) else {
+                        return
+                    }
 
-    private func openSyncError(wallet: Wallet, error: Error) {
-        let viewController = BalanceErrorRouter.module(wallet: wallet, error: error, navigationController: navigationController)
+                    self?.present(viewController, animated: true)
+                })
+
         present(viewController, animated: true)
     }
 
-    private func show(error: String) {
-        HudHelper.instance.showError(title: error)
+    private func openSyncError(wallet: Wallet, error: Error) {
+        let viewController = BalanceErrorModule.viewController(wallet: wallet, error: error, sourceViewController: navigationController)
+        present(viewController, animated: true)
     }
 
     private func openManageWallets() {
@@ -368,6 +356,25 @@ class WalletViewController: ThemeViewController {
         tableView.endUpdates()
 
         viewModel.onDisable(wallet: wallet)
+    }
+
+    private func showBackupPromptIfRequired() {
+        guard let account = viewModel.lastCreatedAccount else {
+            return
+        }
+
+        let viewController = InformationModule.backupPrompt { [weak self] in
+            self?.showBackupModule(account: account)
+        }
+        present(viewController, animated: true)
+    }
+
+    private func showBackupModule(account: Account) {
+        guard let viewController = BackupModule.viewController(account: account) else {
+            return
+        }
+
+        present(viewController, animated: true)
     }
 
 }
@@ -436,6 +443,16 @@ extension WalletViewController: UITableViewDelegate {
         action.backgroundColor = UIColor(red: 0, green: 0, blue: 0, alpha: 0)
 
         return UISwipeActionsConfiguration(actions: [action])
+    }
+
+}
+
+extension WalletViewController: ICreateAccountListener {
+
+    func handleCreateAccount() {
+        dismiss(animated: true) { [weak self] in
+            self?.showBackupPromptIfRequired()
+        }
     }
 
 }

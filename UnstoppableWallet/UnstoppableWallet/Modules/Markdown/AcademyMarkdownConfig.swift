@@ -1,10 +1,12 @@
+import Foundation
+import UIKit
 import ThemeKit
 import Down
 
 struct AcademyMarkdownConfig {
 
     private static let colors = StaticColorCollection(
-            heading1: .themeOz,
+            heading1: .themeLeah,
             heading2: .themeJacob,
             heading3: .themeJacob,
             body: .themeBran

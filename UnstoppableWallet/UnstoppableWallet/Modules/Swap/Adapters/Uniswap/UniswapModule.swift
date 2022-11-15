@@ -1,5 +1,6 @@
+import Foundation
 import UniswapKit
-import EthereumKit
+import EvmKit
 import StorageKit
 
 class UniswapModule {
@@ -9,7 +10,7 @@ class UniswapModule {
     private let service: UniswapService
 
     init?(dex: SwapModule.Dex, dataSourceState: SwapModule.DataSourceState) {
-        guard let evmKit = App.shared.evmBlockchainManager.evmKitManager(blockchain: dex.blockchain).evmKitWrapper?.evmKit else {
+        guard let evmKit = App.shared.evmBlockchainManager.evmKitManager(blockchainType: dex.blockchainType).evmKitWrapper?.evmKit else {
             return nil
         }
 
@@ -72,8 +73,8 @@ extension UniswapModule: ISwapProvider {
         let exactIn = tradeService.tradeType == .exactIn
 
         return SwapModule.DataSourceState(
-                platformCoinFrom: tradeService.platformCoinIn,
-                platformCoinTo: tradeService.platformCoinOut,
+                tokenFrom: tradeService.tokenIn,
+                tokenTo: tradeService.tokenOut,
                 amountFrom: tradeService.amountIn,
                 amountTo: tradeService.amountOut,
                 exactFrom: exactIn)
@@ -90,7 +91,7 @@ extension UniswapModule {
 
     struct GuaranteedAmountViewItem {
         let title: String
-        let value: String
+        let value: String?
     }
 
     enum UniswapWarning: Warning {

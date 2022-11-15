@@ -11,53 +11,40 @@ class NftStorage {
         self.storage = storage
     }
 
-    private func coinTypeIds(records: [NftPriceRecord]) -> [String] {
-        Array(Set(records.map { $0.coinTypeId }))
+    private func tokenQueries(records: [NftPriceRecord]) -> [TokenQuery] {
+        Array(Set(records.map { $0.tokenQuery }))
     }
 
-    private func nftPrice(record: NftPriceRecord?, platformCoins: [PlatformCoin]) -> NftPrice? {
+    private func nftPrice(record: NftPriceRecord?, tokens: [Token]) -> NftPrice? {
         guard let record = record else {
             return nil
         }
 
-        guard let platformCoin = platformCoins.first(where: { $0.coinType.id == record.coinTypeId }) else {
+        guard let token = tokens.first(where: { $0.tokenQuery == record.tokenQuery }) else {
             return nil
         }
 
-        return NftPrice(platformCoin: platformCoin, value: record.value)
+        return NftPrice(token: token, value: record.value)
     }
 
-    private func asset(record: NftAssetRecord, platformCoins: [PlatformCoin]) -> NftAsset {
-        NftAsset(
-                contract: record.contract,
-                collectionUid: record.collectionUid,
-                tokenId: record.tokenId,
+    private func asset(record: NftAssetRecord, tokens: [Token]) -> NftAssetShortMetadata {
+        NftAssetShortMetadata(
+                nftUid: record.nftUid,
+                providerCollectionUid: record.providerCollectionUid,
                 name: record.name,
-                imageUrl: record.imageUrl,
-                imagePreviewUrl: record.imagePreviewUrl,
-                description: record.description,
-                externalLink: record.externalLink,
-                permalink: record.permalink,
-                traits: record.traits,
-                lastSalePrice: nftPrice(record: record.lastSalePrice, platformCoins: platformCoins),
-                onSale: record.onSale
+                previewImageUrl: record.previewImageUrl,
+                onSale: record.onSale,
+                lastSalePrice: nftPrice(record: record.lastSalePrice, tokens: tokens)
         )
     }
 
-    private func collection(record: NftCollectionRecord, platformCoins: [PlatformCoin]) -> NftCollection {
-        NftCollection(
-                contracts: record.contracts,
-                uid: record.uid,
+    private func collection(record: NftCollectionRecord, tokens: [Token]) -> NftCollectionShortMetadata {
+        NftCollectionShortMetadata(
+                providerUid: record.providerUid,
                 name: record.name,
-                description: record.description,
-                imageUrl: record.imageUrl,
-                featuredImageUrl: record.featuredImageUrl,
-                externalUrl: record.externalUrl,
-                discordUrl: record.discordUrl,
-                twitterUsername: record.twitterUsername,
-                averagePrice7d: nftPrice(record: record.averagePrice7d, platformCoins: platformCoins),
-                averagePrice30d: nftPrice(record: record.averagePrice30d, platformCoins: platformCoins),
-                totalSupply: record.totalSupply
+                thumbnailImageUrl: record.thumbnailImageUrl,
+                averagePrice7d: nftPrice(record: record.averagePrice7d, tokens: tokens),
+                averagePrice30d: nftPrice(record: record.averagePrice30d, tokens: tokens)
         )
     }
 
@@ -73,45 +60,83 @@ class NftStorage {
 
 extension NftStorage {
 
-    func assetCollection(accountId: String) throws -> NftAssetCollection {
-        let collectionRecords = try storage.collections(accountId: accountId)
-        let assetRecords = try storage.assets(accountId: accountId)
+    func addressMetadata(nftKey: NftKey) -> NftAddressMetadata? {
+        do {
+            let collectionRecords = try storage.collections(blockchainTypeUid: nftKey.blockchainType.uid, accountId: nftKey.account.id)
+            let assetRecords = try storage.assets(blockchainTypeUid: nftKey.blockchainType.uid, accountId: nftKey.account.id)
 
-        let priceRecords = priceRecords(collectionRecords: collectionRecords) + priceRecords(assetRecords: assetRecords)
-        let platformCoins = try marketKit.platformCoins(coinTypeIds: coinTypeIds(records: priceRecords))
+            let priceRecords = priceRecords(collectionRecords: collectionRecords) + priceRecords(assetRecords: assetRecords)
+            let tokens = try marketKit.tokens(queries: tokenQueries(records: priceRecords))
 
-        return NftAssetCollection(
-                collections: collectionRecords.map { collection(record: $0, platformCoins: platformCoins) },
-                assets: assetRecords.map { asset(record: $0, platformCoins: platformCoins) }
-        )
-    }
-
-    func collection(accountId: String, uid: String) throws -> NftCollection? {
-        guard let record = try storage.collection(accountId: accountId, uid: uid) else {
+            return NftAddressMetadata(
+                    collections: collectionRecords.map { collection(record: $0, tokens: tokens) },
+                    assets: assetRecords.map { asset(record: $0, tokens: tokens) }
+            )
+        } catch {
+            print("Could not fetch NftAddressMetadata: \(error)")
             return nil
         }
-        let priceRecords = priceRecords(collectionRecords: [record])
-        let platformCoins = try marketKit.platformCoins(coinTypeIds: coinTypeIds(records: priceRecords))
-
-        return collection(record: record, platformCoins: platformCoins)
     }
 
-    func asset(accountId: String, collectionUid: String, tokenId: String) throws -> NftAsset? {
-        guard let record = try storage.asset(accountId: accountId, collectionUid: collectionUid, tokenId: tokenId) else {
+    func assetShortMetadata(nftUid: NftUid) -> NftAssetShortMetadata? {
+        do {
+            guard let assetRecord = try storage.asset(nftUid: nftUid) else {
+                return nil
+            }
+
+            return asset(record: assetRecord, tokens: [])
+        } catch {
+            print("Could not fetch NftAssetRecord: \(error)")
             return nil
         }
-        let priceRecords = priceRecords(assetRecords: [record])
-        let platformCoins = try marketKit.platformCoins(coinTypeIds: coinTypeIds(records: priceRecords))
-
-        return asset(record: record, platformCoins: platformCoins)
     }
 
-    func save(assetCollection: NftAssetCollection, accountId: String) throws {
-        try storage.save(
-                collections: assetCollection.collections.map { NftCollectionRecord(accountId: accountId, collection: $0) },
-                assets: assetCollection.assets.map { NftAssetRecord(accountId: accountId, asset: $0) },
-                accountId: accountId
-        )
+    func save(addressMetadata: NftAddressMetadata, nftKey: NftKey) {
+        do {
+            try storage.save(
+                    collections: addressMetadata.collections.map { NftCollectionRecord(blockchainTypeUid: nftKey.blockchainType.uid, accountId: nftKey.account.id, collection: $0) },
+                    assets: addressMetadata.assets.map { NftAssetRecord(blockchainTypeUid: nftKey.blockchainType.uid, accountId: nftKey.account.id, asset: $0) },
+                    blockchainTypeUid: nftKey.blockchainType.uid,
+                    accountId: nftKey.account.id
+            )
+        } catch {
+            print("Could not save NftAddressMetadata: \(error)")
+        }
+    }
+
+    func lastSyncTimestamp(nftKey: NftKey) -> TimeInterval? {
+        do {
+            return try storage.metadataSyncRecord(blockchainTypeUid: nftKey.blockchainType.uid, accountId: nftKey.account.id)?.lastSyncTimestamp
+        } catch {
+            print("Could not fetch NftMetadataSyncRecord: \(error)")
+            return nil
+        }
+    }
+
+    func save(lastSyncTimestamp: TimeInterval, nftKey: NftKey) {
+        do {
+            let record = NftMetadataSyncRecord(blockchainTypeUid: nftKey.blockchainType.uid, accountId: nftKey.account.id, lastSyncTimestamp: lastSyncTimestamp)
+            try storage.save(metadataSyncRecord: record)
+        } catch {
+            print("Could not save NftMetadataSyncRecord: \(error)")
+        }
+    }
+
+    func assetsBriefMetadata(nftUids: Set<NftUid>) -> [NftAssetBriefMetadata] {
+        do {
+            return try storage.assetsBriefMetadata(nftUids: nftUids)
+        } catch {
+            print("Could not fetch [NftAssetBriefMetadata]: \(error)")
+            return []
+        }
+    }
+
+    func save(assetsBriefMetadata: [NftAssetBriefMetadata]) {
+        do {
+            try storage.save(assetsBriefMetadata: assetsBriefMetadata)
+        } catch {
+            print("Could not save [NftAssetBriefMetadata]: \(error)")
+        }
     }
 
 }

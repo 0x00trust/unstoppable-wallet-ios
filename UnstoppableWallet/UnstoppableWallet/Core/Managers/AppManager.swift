@@ -1,32 +1,35 @@
+import Foundation
 import RxSwift
 import StorageKit
 import PinKit
 
 class AppManager {
-    private let accountManager: IAccountManager
+    private let accountManager: AccountManager
     private let walletManager: WalletManager
     private let adapterManager: AdapterManager
     private let pinKit: IPinKit
     private let keychainKit: IKeychainKit
     private let blurManager: BlurManager
-    private let kitCleaner: IKitCleaner
-    private let debugBackgroundLogger: IDebugLogger?
-    private let appVersionManager: IAppVersionManager
-    private let rateAppManager: IRateAppManager
-    private let logRecordManager: ILogRecordManager
-    private let deepLinkManager: IDeepLinkManager
-    private let restoreCustomTokenWorker: RestoreCustomTokenWorker
-    private let restoreFavoriteCoinWorker: RestoreFavoriteCoinWorker
+    private let kitCleaner: KitCleaner
+    private let debugBackgroundLogger: DebugLogger?
+    private let appVersionManager: AppVersionManager
+    private let rateAppManager: RateAppManager
+    private let logRecordManager: LogRecordManager
+    private let deepLinkManager: DeepLinkManager
+    private let evmLabelManager: EvmLabelManager
+    private let walletConnectV2SocketConnectionService: WalletConnectV2SocketConnectionService
+    private let nftMetadataSyncer: NftMetadataSyncer
 
     private let didBecomeActiveSubject = PublishSubject<()>()
     private let willEnterForegroundSubject = PublishSubject<()>()
 
-    init(accountManager: IAccountManager, walletManager: WalletManager, adapterManager: AdapterManager, pinKit: IPinKit,
+    init(accountManager: AccountManager, walletManager: WalletManager, adapterManager: AdapterManager, pinKit: IPinKit,
          keychainKit: IKeychainKit, blurManager: BlurManager,
-         kitCleaner: IKitCleaner, debugLogger: IDebugLogger?,
-         appVersionManager: IAppVersionManager, rateAppManager: IRateAppManager,
-         logRecordManager: ILogRecordManager,
-         deepLinkManager: IDeepLinkManager, restoreCustomTokenWorker: RestoreCustomTokenWorker, restoreFavoriteCoinWorker: RestoreFavoriteCoinWorker
+         kitCleaner: KitCleaner, debugLogger: DebugLogger?,
+         appVersionManager: AppVersionManager, rateAppManager: RateAppManager,
+         logRecordManager: LogRecordManager,
+         deepLinkManager: DeepLinkManager, evmLabelManager: EvmLabelManager,
+         walletConnectV2SocketConnectionService: WalletConnectV2SocketConnectionService, nftMetadataSyncer: NftMetadataSyncer
     ) {
         self.accountManager = accountManager
         self.walletManager = walletManager
@@ -40,8 +43,9 @@ class AppManager {
         self.rateAppManager = rateAppManager
         self.logRecordManager = logRecordManager
         self.deepLinkManager = deepLinkManager
-        self.restoreCustomTokenWorker = restoreCustomTokenWorker
-        self.restoreFavoriteCoinWorker = restoreFavoriteCoinWorker
+        self.evmLabelManager = evmLabelManager
+        self.walletConnectV2SocketConnectionService = walletConnectV2SocketConnectionService
+        self.nftMetadataSyncer = nftMetadataSyncer
     }
 
 }
@@ -60,8 +64,7 @@ extension AppManager {
         appVersionManager.checkLatestVersion()
         rateAppManager.onLaunch()
 
-        try? restoreCustomTokenWorker.run()
-        try? restoreFavoriteCoinWorker.run()
+        evmLabelManager.sync()
     }
 
     func willResignActive() {
@@ -81,6 +84,7 @@ extension AppManager {
         debugBackgroundLogger?.logEnterBackground()
 
         pinKit.didEnterBackground()
+        walletConnectV2SocketConnectionService.didEnterBackground()
     }
 
     func willEnterForeground() {
@@ -93,6 +97,9 @@ extension AppManager {
         keychainKit.handleForeground()
         pinKit.willEnterForeground()
         adapterManager.refresh()
+        walletConnectV2SocketConnectionService.willEnterForeground()
+
+        nftMetadataSyncer.sync()
     }
 
     func willTerminate() {

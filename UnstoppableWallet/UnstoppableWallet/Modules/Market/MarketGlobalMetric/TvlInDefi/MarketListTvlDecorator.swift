@@ -1,3 +1,4 @@
+import Foundation
 import CurrencyKit
 import MarketKit
 
@@ -64,12 +65,14 @@ extension MarketListTvlDecorator: IMarketListDecorator {
         return MarketModule.ListViewItem(
                 uid: uid,
                 iconUrl: iconUrl,
+                iconShape: .round,
                 iconPlaceholderName: iconPlaceholderName,
-                name: name,
-                code: defiCoin.chains.count == 1 ? defiCoin.chains[0] : "coin_page.tvl_rank.multi_chain".localized,
-                rank: "\(defiCoin.tvlRank)",
-                price: CurrencyCompactFormatter.instance.format(currency: currency, value: tvl, alwaysSigned: false) ?? "n/a".localized,
-                dataValue: diff
+                leftPrimaryValue: name,
+                leftSecondaryValue: defiCoin.chains.count == 1 ? defiCoin.chains[0] : "coin_page.tvl_rank.multi_chain".localized,
+                badge: "\(defiCoin.tvlRank)",
+                badgeSecondaryValue: nil,
+                rightPrimaryValue: tvl.flatMap { ValueFormatter.instance.formatShort(currency: currency, value: $0) } ?? "n/a".localized,
+                rightSecondaryValue: diff
         )
     }
 

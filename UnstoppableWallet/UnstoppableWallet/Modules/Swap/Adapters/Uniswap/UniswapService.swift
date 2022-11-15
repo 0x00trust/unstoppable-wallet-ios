@@ -4,7 +4,7 @@ import HsToolKit
 import UniswapKit
 import CurrencyKit
 import BigInt
-import EthereumKit
+import EvmKit
 import Foundation
 import MarketKit
 
@@ -29,6 +29,9 @@ class UniswapService {
     private let errorsRelay = PublishRelay<[Error]>()
     private(set) var errors: [Error] = [] {
         didSet {
+            if oldValue.isEmpty && errors.isEmpty {
+                return
+            }
             errorsRelay.accept(errors)
         }
     }
@@ -60,13 +63,13 @@ class UniswapService {
             self?.onUpdateTrade(state: state)
         }
 
-        subscribe(scheduler, disposeBag, tradeService.platformCoinInObservable) { [weak self] platformCoin in
-            self?.onUpdate(platformCoin: platformCoin)
+        subscribe(scheduler, disposeBag, tradeService.tokenInObservable) { [weak self] token in
+            self?.onUpdate(token: token)
         }
-        onUpdate(platformCoin: tradeService.platformCoinIn)
+        onUpdate(token: tradeService.tokenIn)
 
-        subscribe(scheduler, disposeBag, tradeService.platformCoinOutObservable) { [weak self] platformCoin in
-            self?.onUpdate(platformCoinOut: platformCoin)
+        subscribe(scheduler, disposeBag, tradeService.tokenOutObservable) { [weak self] token in
+            self?.onUpdate(tokenOut: token)
         }
 
         subscribe(scheduler, disposeBag, tradeService.amountInObservable) { [weak self] amount in
@@ -84,22 +87,36 @@ class UniswapService {
         syncState()
     }
 
-    private func onUpdate(platformCoin: PlatformCoin?) {
-        balanceIn = platformCoin.flatMap { balance(platformCoin: $0) }
-        allowanceService.set(platformCoin: platformCoin)
-        pendingAllowanceService.set(platformCoin: platformCoin)
+    private func onUpdate(token: MarketKit.Token?) {
+        balanceIn = token.flatMap { balance(token: $0) }
+        allowanceService.set(token: token)
+        pendingAllowanceService.set(token: token)
     }
 
     private func onUpdate(amountIn: Decimal?) {
         syncState()
     }
 
-    private func onUpdate(platformCoinOut: PlatformCoin?) {
-        balanceOut = platformCoinOut.flatMap { balance(platformCoin: $0) }
+    private func onUpdate(tokenOut: MarketKit.Token?) {
+        balanceOut = tokenOut.flatMap { balance(token: $0) }
     }
 
     private func onUpdatePendingAllowanceState() {
         syncState()
+    }
+
+    private func checkAllowanceError(allowance: CoinValue) -> Error? {
+        guard let balanceIn = balanceIn,
+              balanceIn >= tradeService.amountIn,
+              tradeService.amountIn > allowance.value else {
+            return nil
+        }
+
+        if SwapModule.mustBeRevoked(token: tradeService.tokenIn), allowance.value != 0 {
+            return SwapModule.SwapError.needRevokeAllowance(allowance: allowance)
+        }
+
+        return SwapModule.SwapError.insufficientAllowance
     }
 
     private func syncState() {
@@ -122,8 +139,8 @@ class UniswapService {
             case .loading:
                 loading = true
             case .ready(let allowance):
-                if tradeService.amountIn > allowance.value {
-                    allErrors.append(SwapModule.SwapError.insufficientAllowance)
+                if let error = checkAllowanceError(allowance: allowance) {
+                    allErrors.append(error)
                 }
             case .notReady(let error):
                 allErrors.append(error)
@@ -153,8 +170,8 @@ class UniswapService {
         }
     }
 
-    private func balance(platformCoin: PlatformCoin) -> Decimal? {
-        (adapterManager.adapter(for: platformCoin) as? IBalanceAdapter)?.balanceData.balance
+    private func balance(token: MarketKit.Token) -> Decimal? {
+        (adapterManager.adapter(for: token) as? IBalanceAdapter)?.balanceData.balance
     }
 
 }
@@ -177,8 +194,9 @@ extension UniswapService: ISwapErrorProvider {
         balanceOutRelay.asObservable()
     }
 
-    var approveData: SwapAllowanceService.ApproveData? {
-        guard let amount = balanceIn else {
+    func approveData(amount: Decimal? = nil)  -> SwapAllowanceService.ApproveData? {
+        let amount = amount ?? balanceIn
+        guard let amount = amount else {
             return nil
         }
 

@@ -8,11 +8,13 @@ protocol IScanQrViewControllerDelegate: AnyObject {
     func didScan(viewController: UIViewController, string: String)
 }
 
-class ScanQrViewController: ThemeViewController {
+class ScanQrViewController: ThemeViewController, IDismissDelegate {
     weak var delegate: IScanQrViewControllerDelegate?
 
     private let scanView = ScanQrView()
-    private let cancelButton = ThemeButton()
+    private let cancelButton = PrimaryButton()
+
+    var onUserDismissed: (() -> ())?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -26,12 +28,11 @@ class ScanQrViewController: ThemeViewController {
 
         view.addSubview(cancelButton)
         cancelButton.snp.makeConstraints { maker in
-            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin6x)
-            maker.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom).inset(CGFloat.margin6x)
-            maker.height.equalTo(CGFloat.heightButton)
+            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin24)
+            maker.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom).inset(CGFloat.margin24)
         }
 
-        cancelButton.apply(style: .primaryGray)
+        cancelButton.set(style: .gray)
         cancelButton.setTitle("button.cancel".localized, for: .normal)
         cancelButton.addTarget(self, action: #selector(onCancel), for: .touchUpInside)
 
@@ -51,6 +52,7 @@ class ScanQrViewController: ThemeViewController {
     }
 
     @objc func onCancel() {
+        onUserDismissed?()
         dismiss(animated: true)
     }
 
@@ -60,6 +62,7 @@ class ScanQrViewController: ThemeViewController {
 
     func onScan(string: String) {
         delegate?.didScan(viewController: self, string: string)
+        onUserDismissed?()
         dismiss(animated: true)
     }
 

@@ -1,3 +1,4 @@
+import Foundation
 import RxSwift
 import RxCocoa
 import UniswapKit
@@ -6,9 +7,9 @@ class SwapDeadlineViewModel {
     private let disposeBag = DisposeBag()
 
     private let service: UniswapSettingsService
-    private let decimalParser: IAmountDecimalParser
+    private let decimalParser: AmountDecimalParser
 
-    public init(service: UniswapSettingsService, decimalParser: IAmountDecimalParser) {
+    public init(service: UniswapSettingsService, decimalParser: AmountDecimalParser) {
         self.service = service
         self.decimalParser = decimalParser
     }

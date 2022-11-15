@@ -1,9 +1,10 @@
+import Foundation
 import RxSwift
 import RxRelay
 import MarketKit
 
 class WalletManager {
-    private let accountManager: IAccountManager
+    private let accountManager: AccountManager
     private let storage: WalletStorage
     private let disposeBag = DisposeBag()
 
@@ -13,7 +14,7 @@ class WalletManager {
 
     private var cachedActiveWallets = [Wallet]()
 
-    init(accountManager: IAccountManager, storage: WalletStorage) {
+    init(accountManager: AccountManager, storage: WalletStorage) {
         self.accountManager = accountManager
         self.storage = storage
 
@@ -84,6 +85,11 @@ extension WalletManager {
 
     func save(wallets: [Wallet]) {
         handle(newWallets: wallets, deletedWallets: [])
+    }
+
+    func save(enabledWallets: [EnabledWallet]) {
+        storage.handle(newEnabledWallets: enabledWallets)
+        reloadWallets()
     }
 
     func delete(wallets: [Wallet]) {

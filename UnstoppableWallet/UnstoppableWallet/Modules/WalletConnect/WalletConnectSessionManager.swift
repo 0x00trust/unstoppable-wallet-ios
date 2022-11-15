@@ -3,17 +3,15 @@ import RxSwift
 import RxRelay
 
 class WalletConnectSessionManager {
-    private let storage: IWalletConnectSessionStorage
-    private let accountManager: IAccountManager
-    private let accountSettingManager: AccountSettingManager
+    private let storage: WalletConnectSessionStorage
+    private let accountManager: AccountManager
     private let disposeBag = DisposeBag()
 
     private let sessionsRelay = BehaviorRelay<[WalletConnectSession]>(value: [])
 
-    init(storage: IWalletConnectSessionStorage, accountManager: IAccountManager, accountSettingManager: AccountSettingManager) {
+    init(storage: WalletConnectSessionStorage, accountManager: AccountManager) {
         self.storage = storage
         self.accountManager = accountManager
-        self.accountSettingManager = accountSettingManager
 
         accountManager.accountDeletedObservable
                 .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .background))

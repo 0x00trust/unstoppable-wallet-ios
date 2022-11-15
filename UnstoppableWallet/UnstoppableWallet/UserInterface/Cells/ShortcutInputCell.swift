@@ -4,10 +4,10 @@ import SnapKit
 
 class ShortcutInputCell: UITableViewCell {
     private let formValidatedView: FormValidatedView
-    private let inputStackView = InputStackView()
+    private let inputStackView = InputStackView(singleLine: true)
 
-    private var shortcutViews = [InputButtonWrapperView]()
-    private let deleteView = InputButtonWrapperView(style: .secondaryIcon)
+    private var shortcutViews = [InputSecondaryButtonWrapperView]()
+    private let deleteView = InputSecondaryCircleButtonWrapperView()
 
     var onChangeText: ((String?) -> ())?
 
@@ -24,7 +24,7 @@ class ShortcutInputCell: UITableViewCell {
             maker.edges.equalToSuperview()
         }
 
-        deleteView.button.setImage(UIImage(named: "trash_20"), for: .normal)
+        deleteView.button.set(image: UIImage(named: "trash_20"))
         deleteView.onTapButton = { [weak self] in self?.onTapDelete() }
 
         inputStackView.appendSubview(deleteView)
@@ -82,14 +82,19 @@ extension ShortcutInputCell {
         set { inputStackView.isUserInteractionEnabled = newValue }
     }
 
-    var maximumNumberOfLines: Int {
-        get { inputStackView.maximumNumberOfLines }
-        set { inputStackView.maximumNumberOfLines = newValue }
-    }
-
     var keyboardType: UIKeyboardType {
         get { inputStackView.keyboardType }
         set { inputStackView.keyboardType = newValue }
+    }
+
+    var autocapitalizationType: UITextAutocapitalizationType {
+        get { inputStackView.autocapitalizationType }
+        set { inputStackView.autocapitalizationType = newValue }
+    }
+
+    var autocorrectionType: UITextAutocorrectionType {
+        get { inputStackView.autocorrectionType }
+        set { inputStackView.autocorrectionType = newValue }
     }
 
     func set(cautionType: CautionType?) {
@@ -98,7 +103,7 @@ extension ShortcutInputCell {
 
     func set(shortcuts: [InputShortcut]) {
         shortcutViews = shortcuts.map { shortcut in
-            let view = InputButtonWrapperView(style: .secondaryDefault)
+            let view = InputSecondaryButtonWrapperView(style: .default)
 
             view.button.setTitle(shortcut.title, for: .normal)
             view.onTapButton = { [weak self] in

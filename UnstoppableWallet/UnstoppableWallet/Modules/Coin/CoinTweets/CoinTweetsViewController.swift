@@ -7,20 +7,20 @@ import HUD
 
 class CoinTweetsViewController: ThemeViewController {
     private let viewModel: CoinTweetsViewModel
-    private let urlManager: IUrlManager
+    private let urlManager: UrlManager
     private let disposeBag = DisposeBag()
 
     private let tableView = SectionsTableView(style: .grouped)
     private let spinner = HUDActivityView.create(with: .medium24)
-    private let infoLabel = UILabel()
-    private let errorView = MarketListErrorView()
+    private let infoView = PlaceholderView()
+    private let errorView = PlaceholderViewModule.reachabilityView()
     private let refreshControl = UIRefreshControl()
 
     weak var parentNavigationController: UINavigationController?
 
     private var viewItems: [CoinTweetsViewModel.ViewItem]?
 
-    init(viewModel: CoinTweetsViewModel, urlManager: IUrlManager) {
+    init(viewModel: CoinTweetsViewModel, urlManager: UrlManager) {
         self.viewModel = viewModel
         self.urlManager = urlManager
 
@@ -53,23 +53,19 @@ class CoinTweetsViewController: ThemeViewController {
 
         spinner.startAnimating()
 
-        wrapperView.addSubview(infoLabel)
-        infoLabel.snp.makeConstraints { maker in
-            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin48)
-            maker.centerY.equalToSuperview()
+        wrapperView.addSubview(infoView)
+        infoView.snp.makeConstraints { maker in
+            maker.edges.equalToSuperview()
         }
 
-        infoLabel.textAlignment = .center
-        infoLabel.numberOfLines = 0
-        infoLabel.font = .subhead2
-        infoLabel.textColor = .themeGray
+        infoView.image = UIImage(named: "no_tweets_48")
 
         wrapperView.addSubview(errorView)
         errorView.snp.makeConstraints { maker in
             maker.edges.equalToSuperview()
         }
 
-        errorView.onTapRetry = { [weak self] in self?.refresh() }
+        errorView.configureSyncError(action: { [weak self] in self?.onRetry() })
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { maker in
@@ -81,7 +77,7 @@ class CoinTweetsViewController: ThemeViewController {
 
         tableView.sectionDataSource = self
         tableView.registerCell(forClass: TweetCell.self)
-        tableView.registerCell(forClass: ButtonCell.self)
+        tableView.registerCell(forClass: SecondaryButtonCell.self)
 
         subscribe(disposeBag, viewModel.viewItemsDriver) { [weak self] in self?.sync(viewItems: $0) }
         subscribe(disposeBag, viewModel.loadingDriver) { [weak self] loading in
@@ -89,21 +85,15 @@ class CoinTweetsViewController: ThemeViewController {
         }
         subscribe(disposeBag, viewModel.infoDriver) { [weak self] info in
             if let info = info {
-                self?.infoLabel.text = info
-                self?.infoLabel.isHidden = false
+                self?.infoView.text = info
+                self?.infoView.isHidden = false
             } else {
-                self?.infoLabel.isHidden = true
+                self?.infoView.isHidden = true
             }
         }
-        subscribe(disposeBag, viewModel.errorDriver) { [weak self] error in
-            if let error = error {
-                self?.errorView.text = error
-                self?.errorView.isHidden = false
-            } else {
-                self?.errorView.isHidden = true
-            }
+        subscribe(disposeBag, viewModel.syncErrorDriver) { [weak self] visible in
+            self?.errorView.isHidden = !visible
         }
-
         viewModel.viewDidLoad()
     }
 
@@ -113,8 +103,8 @@ class CoinTweetsViewController: ThemeViewController {
         tableView.refreshControl = refreshControl
     }
 
-    private func refresh() {
-        viewModel.refresh()
+    @objc private func onRetry() {
+        refresh()
     }
 
     @objc private func onRefresh() {
@@ -123,6 +113,10 @@ class CoinTweetsViewController: ThemeViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             self?.refreshControl.endRefreshing()
         }
+    }
+
+    private func refresh() {
+        viewModel.refresh()
     }
 
     private func sync(viewItems: [CoinTweetsViewModel.ViewItem]?) {
@@ -186,11 +180,13 @@ extension CoinTweetsViewController: SectionsDataSource {
                 headerState: .margin(height: .margin16),
                 footerState: .margin(height: .margin16),
                 rows: [
-                    Row<ButtonCell>(
+                    Row<SecondaryButtonCell>(
                             id: "see-on-twitter",
-                            height: ButtonCell.height(style: .secondaryDefault),
+                            height: SecondaryButtonCell.height,
                             bind: { [weak self] cell, _ in
-                                cell.bind(style: .secondaryDefault, title: "coin_page.tweets.see_on_twitter".localized, compact: true) { [weak self] in
+                                cell.set(style: .default)
+                                cell.title = "coin_page.tweets.see_on_twitter".localized
+                                cell.onTap = {
                                     self?.onTapSeeOnTwitter()
                                 }
                             }

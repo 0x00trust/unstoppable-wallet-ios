@@ -1,7 +1,7 @@
 import Foundation
 import RxCocoa
 import RxSwift
-import EthereumKit
+import EvmKit
 import BigInt
 
 class SwapApproveViewModel {
@@ -16,9 +16,9 @@ class SwapApproveViewModel {
 
     private let amountCautionRelay = BehaviorRelay<Caution?>(value: nil)
 
-    private let decimalParser: IAmountDecimalParser
+    private let decimalParser: AmountDecimalParser
 
-    init(service: SwapApproveService, coinService: CoinService, decimalParser: IAmountDecimalParser) {
+    init(service: SwapApproveService, coinService: CoinService, decimalParser: AmountDecimalParser) {
         self.service = service
         self.coinService = coinService
         self.decimalParser = decimalParser
@@ -84,12 +84,11 @@ extension SwapApproveViewModel {
         }
 
         // TODO: Decimal count check must be implemented in coinService and used in other places too
-        return amount.decimalCount <= min(coinService.platformCoin.decimals, maxCoinDecimals)
+        return amount.decimalCount <= min(coinService.token.decimals, maxCoinDecimals)
     }
 
     func onChange(amount: String?) {
-        let amount = amount
-                .flatMap { Decimal(string: $0) }
+        let amount = decimalParser.parseAnyDecimal(from: amount)
                 .map { coinService.fractionalMonetaryValue(value: $0) }
 
         service.set(amount: amount)

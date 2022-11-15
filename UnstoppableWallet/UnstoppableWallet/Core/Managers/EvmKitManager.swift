@@ -1,10 +1,13 @@
+import Foundation
 import RxSwift
 import RxRelay
-import EthereumKit
-import Erc20Kit
+import EvmKit
+import Eip20Kit
+import NftKit
 import UniswapKit
 import OneInchKit
 import HdWalletKit
+import MarketKit
 
 class EvmKitManager {
     let chain: Chain
@@ -23,18 +26,18 @@ class EvmKitManager {
         self.chain = chain
         self.syncSourceManager = syncSourceManager
 
-        subscribe(disposeBag, syncSourceManager.syncSourceObservable) { [weak self] account, blockchain, _ in
-            self?.handleUpdatedSyncSource(account: account, blockchain: blockchain)
+        subscribe(disposeBag, syncSourceManager.syncSourceObservable) { [weak self] blockchainType in
+            self?.handleUpdatedSyncSource(blockchainType: blockchainType)
         }
     }
 
-    private func handleUpdatedSyncSource(account: Account, blockchain: EvmBlockchain) {
+    private func handleUpdatedSyncSource(blockchainType: BlockchainType) {
         queue.sync {
             guard let _evmKitWrapper = _evmKitWrapper else {
                 return
             }
 
-            guard account == currentAccount, _evmKitWrapper.blockchain == blockchain else {
+            guard _evmKitWrapper.blockchainType == blockchainType else {
                 return
             }
 
@@ -43,28 +46,33 @@ class EvmKitManager {
         }
     }
 
-    private func _evmKitWrapper(account: Account, blockchain: EvmBlockchain) throws -> EvmKitWrapper {
+    private func _evmKitWrapper(account: Account, blockchainType: BlockchainType) throws -> EvmKitWrapper {
         if let _evmKitWrapper = _evmKitWrapper, let currentAccount = currentAccount, currentAccount == account {
             return _evmKitWrapper
         }
 
-        let syncSource = syncSourceManager.syncSource(account: account, blockchain: blockchain)
+        let syncSource = syncSourceManager.syncSource(blockchainType: blockchainType)
 
-        let address: EthereumKit.Address
+        let address: EvmKit.Address
         var signer: Signer?
 
         switch account.type {
         case let .mnemonic(words, salt):
-            let seed = Mnemonic.seed(mnemonic: words, passphrase: salt)
+            guard let seed = Mnemonic.seed(mnemonic: words, passphrase: salt) else {
+                throw KitWrapperError.mnemonicNoSeed
+            }
             address = try Signer.address(seed: seed, chain: chain)
             signer = try Signer.instance(seed: seed, chain: chain)
-        case let .address(value):
+        case let .evmPrivateKey(data):
+            address = Signer.address(privateKey: data)
+            signer = Signer.instance(privateKey: data, chain: chain)
+        case let .evmAddress(value):
             address = value
         default:
             throw AdapterError.unsupportedAccount
         }
 
-        let evmKit = try EthereumKit.Kit.instance(
+        let evmKit = try EvmKit.Kit.instance(
                 address: address,
                 chain: chain,
                 rpcSource: syncSource.rpcSource,
@@ -73,18 +81,36 @@ class EvmKitManager {
                 minLogLevel: .error
         )
 
-        Erc20Kit.Kit.addDecorator(to: evmKit)
-        Erc20Kit.Kit.addTransactionSyncer(to: evmKit)
+        Eip20Kit.Kit.addDecorators(to: evmKit)
+        Eip20Kit.Kit.addTransactionSyncer(to: evmKit)
 
-        UniswapKit.Kit.addDecorator(to: evmKit)
-        UniswapKit.Kit.addTransactionWatcher(to: evmKit)
+        var nftKit: NftKit.Kit?
+        let supportedNftTypes = blockchainType.supportedNftTypes
 
-        OneInchKit.Kit.addDecorator(to: evmKit)
-        OneInchKit.Kit.addTransactionWatcher(to: evmKit)
+        if !supportedNftTypes.isEmpty {
+            let kit = try NftKit.Kit.instance(evmKit: evmKit)
+
+            for nftType in supportedNftTypes {
+                switch nftType {
+                case .eip721:
+                    kit.addEip721TransactionSyncer()
+                    kit.addEip721Decorators()
+                case .eip1155:
+                    kit.addEip1155TransactionSyncer()
+                    kit.addEip1155Decorators()
+                }
+            }
+
+            nftKit = kit
+        }
+
+        UniswapKit.Kit.addDecorators(to: evmKit)
+
+        OneInchKit.Kit.addDecorators(to: evmKit)
 
         evmKit.start()
 
-        let wrapper = EvmKitWrapper(blockchain: blockchain, evmKit: evmKit, signer: signer)
+        let wrapper = EvmKitWrapper(blockchainType: blockchainType, evmKit: evmKit, nftKit: nftKit, signer: signer)
 
         _evmKitWrapper = wrapper
         currentAccount = account
@@ -107,23 +133,29 @@ extension EvmKitManager {
     }
 
     var evmKitWrapper: EvmKitWrapper? {
-        queue.sync { _evmKitWrapper }
+        queue.sync {
+            _evmKitWrapper
+        }
     }
 
-    func evmKitWrapper(account: Account, blockchain: EvmBlockchain) throws -> EvmKitWrapper {
-        try queue.sync { try _evmKitWrapper(account: account, blockchain: blockchain)  }
+    func evmKitWrapper(account: Account, blockchainType: BlockchainType) throws -> EvmKitWrapper {
+        try queue.sync {
+            try _evmKitWrapper(account: account, blockchainType: blockchainType)
+        }
     }
 
 }
 
 class EvmKitWrapper {
-    let blockchain: EvmBlockchain
-    let evmKit: EthereumKit.Kit
+    let blockchainType: BlockchainType
+    let evmKit: EvmKit.Kit
+    let nftKit: NftKit.Kit?
     let signer: Signer?
 
-    init(blockchain: EvmBlockchain, evmKit: EthereumKit.Kit, signer: Signer?) {
-        self.blockchain = blockchain
+    init(blockchainType: BlockchainType, evmKit: EvmKit.Kit, nftKit: NftKit.Kit?, signer: Signer?) {
+        self.blockchainType = blockchainType
         self.evmKit = evmKit
+        self.nftKit = nftKit
         self.signer = signer
     }
 
@@ -133,14 +165,26 @@ class EvmKitWrapper {
         }
 
         return evmKit.rawTransaction(transactionData: transactionData, gasPrice: gasPrice, gasLimit: gasLimit, nonce: nonce)
-                .flatMap { [unowned self] rawTransaction in
+                .flatMap { [weak self] rawTransaction in
+                    guard let strongSelf = self else {
+                        return Single.error(AppError.weakReference)
+                    }
+
                     do {
                         let signature = try signer.signature(rawTransaction: rawTransaction)
-                        return evmKit.sendSingle(rawTransaction: rawTransaction, signature: signature)
+                        return strongSelf.evmKit.sendSingle(rawTransaction: rawTransaction, signature: signature)
                     } catch {
                         return Single.error(error)
                     }
                 }
+    }
+
+}
+
+extension EvmKitManager {
+
+    enum KitWrapperError: Error {
+        case mnemonicNoSeed
     }
 
 }

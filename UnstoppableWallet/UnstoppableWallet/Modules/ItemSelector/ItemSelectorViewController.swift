@@ -8,12 +8,12 @@ class ItemSelectorViewController: ThemeActionSheetController {
     private var titleView: UIView?
     private let tableView = SelfSizedSectionsTableView(style: .grouped)
 
-    private var titleItem: ItemSelectorModule.Title
+    private var titleItem: BottomSheetItem.Title
     private var items = [ItemSelectorModule.Item]()
 
     private var onTap: ((ItemSelectorViewController, Int) -> ())?
 
-    init(title: ItemSelectorModule.Title, onTap: ((ItemSelectorViewController, Int) -> ())?) {
+    init(title: BottomSheetItem.Title, onTap: ((ItemSelectorViewController, Int) -> ())?) {
         titleItem = title
         self.onTap = onTap
 
@@ -54,13 +54,12 @@ class ItemSelectorViewController: ThemeActionSheetController {
             } else {
                 maker.top.equalToSuperview()
             }
-            maker.leading.trailing.bottom.equalToSuperview()
+            maker.leading.trailing.equalToSuperview()
+            maker.bottom.equalTo(view.safeAreaLayoutGuide).inset(CGFloat.margin24)
         }
 
 //        tableView.allowsSelection = false
 
-        tableView.registerCell(forClass: HighlightedDescriptionCell.self)
-        tableView.registerCell(forClass: ItemSelectorSimpleCell.self)
         tableView.sectionDataSource = self
 
         tableView.reload()
@@ -77,92 +76,19 @@ class ItemSelectorViewController: ThemeActionSheetController {
     private func row(viewItem: ItemSelectorModule.Item, rowIndex: Int, isLast: Bool) -> RowProtocol {
         switch viewItem {
         case .description(let text):
-            return Row<HighlightedDescriptionCell>(
-                    id: "description_\(text)",
-                    dynamicHeight: { width in
-                        HighlightedDescriptionCell.height(containerWidth: width, text: text)
-                    },
-                    bind: { cell, _ in
-                        cell.descriptionText = text
-                    }
-            )
+            return tableView.highlightedDescriptionRow(id: "description_\(text)", text: text)
         case .simple(let viewItem):
-            return Row<ItemSelectorSimpleCell>(
-                    id: "item_\(viewItem.title)",
-                    hash: "\(viewItem.selected)",
-                    height: .heightCell48,
-                    autoDeselect: true,
-                    bind: { cell, _ in
-                        cell.set(backgroundStyle: .transparent, isFirst: rowIndex == 0, isLast: isLast)
-                        cell.title = viewItem.title
-                        cell.titleColor = viewItem.titleColor
-                        cell.isSelected = viewItem.selected
-                    },
-                    action: { [weak self] _ in
-                        self?.onTap(at: rowIndex)
-                    }
-            )
-        case .complex(let viewItem):
-            if let subtitle = viewItem.subtitle {
-                return CellBuilder.selectableRow(
-                        elements: [.multiText, .image20],
-                        tableView: tableView,
-                        id: "row_\(rowIndex)",
-                        hash: "\(viewItem.selected)",
-                        height: .heightDoubleLineCell,
-                        autoDeselect: true,
-                        bind: { cell in
-                            cell.set(backgroundStyle: .transparent, isFirst: rowIndex == 0, isLast: isLast)
-
-                            cell.bind(index: 0, block: { (component: MultiTextComponent) in
-                                component.set(style: .m1)
-
-                                component.title.set(style: viewItem.titleStyle)
-                                component.title.text = viewItem.title
-
-                                component.subtitle.set(style: viewItem.subtitleStyle)
-                                component.subtitle.text = subtitle
-                            })
-
-                            cell.bind(index: 1, block: { (component: ImageComponent) in
-                                component.isHidden = !viewItem.selected
-                                component.imageView.image = UIImage(named: "check_1_20")?.withTintColor(.themeJacob)
-                            })
-                        },
-                        action: { [weak self] in
-                            self?.onTap(at: rowIndex)
-                        }
-                )
+            return BottomSheetItem.simpleRow(tableView: tableView, viewItem: viewItem, rowIndex: rowIndex, isLast: isLast) { [weak self] in
+                self?.onTap(at: rowIndex)
             }
-
-            return CellBuilder.selectableRow(
-                    elements: [.text, .image20],
-                    tableView: tableView,
-                    id: "row_\(rowIndex)",
-                    hash: "\(viewItem.selected)",
-                    height: .heightCell48,
-                    autoDeselect: true,
-                    bind: { cell in
-                        cell.set(backgroundStyle: .transparent, isFirst: rowIndex == 0, isLast: isLast)
-
-                        cell.bind(index: 0, block: { (component: TextComponent) in
-                            component.set(style: viewItem.titleStyle)
-                            component.text = viewItem.title
-                        })
-
-                        cell.bind(index: 1, block: { (component: ImageComponent) in
-                            component.isHidden = !viewItem.selected
-                            component.imageView.image = UIImage(named: "check_1_20")?.withTintColor(.themeJacob)
-                        })
-                    },
-                    action: { [weak self] in
-                        self?.onTap(at: rowIndex)
-                    }
-            )
+        case .complex(let viewItem):
+            return BottomSheetItem.complexRow(tableView: tableView, viewItem: viewItem, rowIndex: rowIndex, isLast: isLast) { [weak self] in
+                self?.onTap(at: rowIndex)
+            }
         }
     }
 
-    private func updateSimpleTitle(viewItem: ItemSelectorModule.SimpleTitleViewItem) {
+    private func updateSimpleTitle(viewItem: BottomSheetItem.SimpleTitleViewItem) {
         guard let titleView = titleView as? SimpleSheetTitleView else {
             return
         }
@@ -171,15 +97,16 @@ class ItemSelectorViewController: ThemeActionSheetController {
         titleView.textColor = viewItem.titleColor
     }
 
-    private func updateComplexTitle(viewItem: ItemSelectorModule.ComplexTitleViewItem) {
+    private func updateComplexTitle(viewItem: BottomSheetItem.ComplexTitleViewItem) {
         guard let titleView = titleView as? BottomSheetTitleView else {
             return
         }
 
-        titleView.bind(title: viewItem.title, subtitle: viewItem.subtitle, image: viewItem.image, tintColor: viewItem.tintColor)
-        titleView.titleColor = viewItem.titleColor
-        titleView.subtitleColor = viewItem.subtitleColor
-        titleView.onTapClose = { [weak self] in self?.onTapClose() }
+        titleView.title = viewItem.title
+        titleView.image = viewItem.image
+        titleView.onTapClose = { [weak self] in
+            self?.onTapClose()
+        }
     }
 
 }
@@ -208,7 +135,7 @@ extension ItemSelectorViewController {
         tableView.reload()
     }
 
-    func set(title: ItemSelectorModule.Title) {
+    func set(title: BottomSheetItem.Title) {
         switch (titleItem, title) {
         case (.simple, .simple(let viewItem)): updateSimpleTitle(viewItem: viewItem)
         case (.complex, .complex(let viewItem)): updateComplexTitle(viewItem: viewItem)

@@ -11,9 +11,7 @@ class MainSettingsViewModel {
     private let manageWalletsAlertRelay: BehaviorRelay<Bool>
     private let securityCenterAlertRelay: BehaviorRelay<Bool>
     private let walletConnectSessionCountRelay: BehaviorRelay<String?>
-    private let launchScreenRelay: BehaviorRelay<String>
     private let baseCurrencyRelay: BehaviorRelay<String>
-    private let themeModeRelay: BehaviorRelay<ThemeMode>
     private let aboutAlertRelay: BehaviorRelay<Bool>
     private let openWalletConnectRelay = PublishRelay<WalletConnectOpenMode>()
     private let openLinkRelay = PublishRelay<String>()
@@ -24,9 +22,7 @@ class MainSettingsViewModel {
         manageWalletsAlertRelay = BehaviorRelay(value: !service.allBackedUp)
         securityCenterAlertRelay = BehaviorRelay(value: !service.isPinSet)
         walletConnectSessionCountRelay = BehaviorRelay(value: Self.convert(walletConnectSessionCount: service.walletConnectSessionCount))
-        launchScreenRelay = BehaviorRelay(value: service.launchScreen.title)
         baseCurrencyRelay = BehaviorRelay(value: service.baseCurrency.code)
-        themeModeRelay = BehaviorRelay(value: service.themeMode)
         aboutAlertRelay = BehaviorRelay(value: !service.termsAccepted)
 
         service.allBackedUpObservable
@@ -50,21 +46,10 @@ class MainSettingsViewModel {
                 })
                 .disposed(by: disposeBag)
 
-        subscribe(disposeBag, service.launchScreenObservable) { [weak self] in
-            self?.launchScreenRelay.accept($0.title)
-        }
-
         service.baseCurrencyObservable
                 .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .userInitiated))
                 .subscribe(onNext: { [weak self] currency in
                     self?.baseCurrencyRelay.accept(currency.code)
-                })
-                .disposed(by: disposeBag)
-
-        service.themeModeObservable
-                .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .userInitiated))
-                .subscribe(onNext: { [weak self] themeMode in
-                    self?.themeModeRelay.accept(themeMode)
                 })
                 .disposed(by: disposeBag)
 
@@ -104,10 +89,6 @@ extension MainSettingsViewModel {
         walletConnectSessionCountRelay.asDriver()
     }
 
-    var launchScreenDriver: Driver<String> {
-        launchScreenRelay.asDriver()
-    }
-
     var baseCurrencyDriver: Driver<String> {
         baseCurrencyRelay.asDriver()
     }
@@ -120,14 +101,6 @@ extension MainSettingsViewModel {
         service.currentLanguageDisplayName
     }
 
-    var themeModeDriver: Driver<ThemeMode> {
-        themeModeRelay.asDriver()
-    }
-
-    var themeMode: ThemeMode {
-        service.themeMode
-    }
-
     var appVersion: String {
         service.appVersion
     }
@@ -138,7 +111,7 @@ extension MainSettingsViewModel {
             return
         }
 
-        openWalletConnectRelay.accept(activeAccount.watchAccount ? .watchAccount : .list)
+        openWalletConnectRelay.accept(activeAccount.type.supportsWalletConnect ? .list : .nonSupportedAccountType(accountTypeDescription: activeAccount.type.description))
     }
 
     func onTapCompanyLink() {
@@ -152,7 +125,7 @@ extension MainSettingsViewModel {
     enum WalletConnectOpenMode {
         case list
         case noAccount
-        case watchAccount
+        case nonSupportedAccountType(accountTypeDescription: String)
     }
 
 }

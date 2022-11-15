@@ -6,7 +6,7 @@ import MarketKit
 class CoinPageService {
     let fullCoin: FullCoin
     private let favoritesManager: FavoritesManager
-    private let accountManager: IAccountManager
+    private let accountManager: AccountManager
     private let walletManager: WalletManager
     private let enableCoinService: EnableCoinService
     private let disposeBag = DisposeBag()
@@ -27,7 +27,7 @@ class CoinPageService {
         }
     }
 
-    init(fullCoin: FullCoin, favoritesManager: FavoritesManager, accountManager: IAccountManager, walletManager: WalletManager, enableCoinService: EnableCoinService) {
+    init(fullCoin: FullCoin, favoritesManager: FavoritesManager, accountManager: AccountManager, walletManager: WalletManager, enableCoinService: EnableCoinService) {
         self.fullCoin = fullCoin
         self.favoritesManager = favoritesManager
         self.accountManager = accountManager
@@ -36,8 +36,8 @@ class CoinPageService {
 
         subscribe(disposeBag, favoritesManager.coinUidsUpdatedObservable) { [weak self] in self?.syncFavorite() }
         subscribe(disposeBag, walletManager.activeWalletsUpdatedObservable) { [weak self] _ in self?.syncWalletState() }
-        subscribe(disposeBag, enableCoinService.enableCoinObservable) { [weak self] configuredPlatformsCoins, restoreSettings in
-            self?.handleEnableCoin(configuredPlatformCoins: configuredPlatformsCoins, restoreSettings: restoreSettings)
+        subscribe(disposeBag, enableCoinService.enableCoinObservable) { [weak self] configuredTokens, restoreSettings in
+            self?.handleEnableCoin(configuredTokens: configuredTokens, restoreSettings: restoreSettings)
         }
 
         syncFavorite()
@@ -49,8 +49,8 @@ class CoinPageService {
     }
 
     private var enabledWallets: [Wallet] {
-        let platforms = fullCoin.supportedPlatforms
-        return walletManager.activeWallets.filter { platforms.contains($0.platform) }
+        let tokens = fullCoin.supportedTokens
+        return walletManager.activeWallets.filter { tokens.contains($0.token) }
     }
 
     private func syncWalletState() {
@@ -61,23 +61,23 @@ class CoinPageService {
 
         if activeAccount.watchAccount {
             walletState = .watchAccount
-        } else if fullCoin.supportedPlatforms.isEmpty {
+        } else if fullCoin.eligibleTokens(accountType: activeAccount.type).isEmpty {
             walletState = .unsupported
         } else {
             walletState = .supported(added: !enabledWallets.isEmpty)
         }
     }
 
-    private func handleEnableCoin(configuredPlatformCoins: [ConfiguredPlatformCoin], restoreSettings: RestoreSettings) {
+    private func handleEnableCoin(configuredTokens: [ConfiguredToken], restoreSettings: RestoreSettings) {
         guard let account = accountManager.activeAccount else {
             return
         }
 
-        if !restoreSettings.isEmpty && configuredPlatformCoins.count == 1 {
-            enableCoinService.save(restoreSettings: restoreSettings, account: account, coinType: configuredPlatformCoins[0].platformCoin.coinType)
+        if !restoreSettings.isEmpty && configuredTokens.count == 1 {
+            enableCoinService.save(restoreSettings: restoreSettings, account: account, blockchainType: configuredTokens[0].token.blockchainType)
         }
 
-        let wallets = configuredPlatformCoins.map { Wallet(configuredPlatformCoin: $0, account: account) }
+        let wallets = configuredTokens.map { Wallet(configuredToken: $0, account: account) }
         walletManager.handle(newWallets: wallets, deletedWallets: [])
     }
 
@@ -106,7 +106,11 @@ extension CoinPageService {
             return
         }
 
-        enableCoinService.enable(fullCoin: fullCoin, account: accountManager.activeAccount)
+        guard let account = accountManager.activeAccount else {
+            return
+        }
+
+        enableCoinService.enable(fullCoin: fullCoin, accountType: account.type, account: account)
     }
 
 }

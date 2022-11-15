@@ -4,14 +4,19 @@ import SnapKit
 
 class InputStackView: UIView {
     private let stackView = UIStackView()
-    private let formTextView = FormTextView()
+    private let formTextView: IFormTextView
     private var leftViews = [(ISizeAwareView, CGFloat)]()
     private var rightViews = [ISizeAwareView]()
 
-    init() {
+    init(singleLine: Bool = false) {
+        if singleLine {
+            formTextView = SingleLineFormTextView()
+        } else {
+            formTextView = FormTextView()
+        }
         super.init(frame: .zero)
 
-        formTextView.textViewInset = UIEdgeInsets(top: .margin12, left: .margin4, bottom: .margin12, right: .margin4)
+        formTextView.textViewInset = UIEdgeInsets(top: .margin12, left: 0, bottom: .margin12, right: 0)
 
         addSubview(stackView)
         stackView.snp.makeConstraints { maker in
@@ -20,7 +25,7 @@ class InputStackView: UIView {
 
         stackView.spacing = .margin8
         stackView.alignment = .fill
-        stackView.layoutMargins = UIEdgeInsets(top: 0, left: .margin8, bottom: 0, right: .margin8)
+        stackView.layoutMargins = UIEdgeInsets(top: 0, left: .margin16, bottom: 0, right: .margin16)
         stackView.isLayoutMarginsRelativeArrangement = true
 
         stackView.addArrangedSubview(formTextView)
@@ -58,15 +63,20 @@ extension InputStackView {
         set { formTextView.textColor = newValue }
     }
 
+    var font: UIFont? {
+        get { formTextView.font }
+        set { formTextView.font = newValue }
+    }
+
     var isEditable: Bool {
         get { formTextView.isEditable }
         set { formTextView.isEditable = newValue }
     }
 
-    var maximumNumberOfLines: Int {
-        get { formTextView.maximumNumberOfLines }
-        set { formTextView.maximumNumberOfLines = newValue }
-    }
+//    var maximumNumberOfLines: Int {
+//        get { formTextView.maximumNumberOfLines }
+//        set { formTextView.maximumNumberOfLines = newValue }
+//    }
 
     var keyboardType: UIKeyboardType {
         get { formTextView.keyboardType }
@@ -76,6 +86,11 @@ extension InputStackView {
     var autocapitalizationType: UITextAutocapitalizationType {
         get { formTextView.autocapitalizationType }
         set { formTextView.autocapitalizationType = newValue }
+    }
+
+    var autocorrectionType: UITextAutocorrectionType {
+        get { formTextView.autocorrectionType }
+        set { formTextView.autocorrectionType = newValue }
     }
 
     var onChangeText: ((String?) -> ())? {

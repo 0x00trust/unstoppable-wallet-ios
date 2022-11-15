@@ -16,12 +16,16 @@ extension DepositViewModel {
         service.coin
     }
 
-    var coinType: CoinType {
-        service.coinType
+    var placeholderImageName: String {
+        service.token.placeholderImageName
     }
 
     var address: String {
         service.address
+    }
+
+    var watchAccount: Bool {
+        service.watchAccount
     }
 
     var isMainNet: Bool {

@@ -4,20 +4,29 @@ import RxCocoa
 import ComponentKit
 import ThemeKit
 
+protocol IEditableFeeViewModel: IFeeViewModel {
+    var editButtonVisibleDriver: Driver<Bool> { get }
+    var editButtonHighlightedDriver: Driver<Bool> { get }
+}
+
 class EditableFeeCell: BaseSelectableThemeCell {
     private let disposeBag = DisposeBag()
 
-    init(viewModel: EvmFeeViewModel) {
+    private let viewModel: IEditableFeeViewModel
+
+    init(viewModel: IEditableFeeViewModel, isFirst: Bool = true, isLast: Bool = true) {
+        self.viewModel = viewModel
         super.init(style: .default, reuseIdentifier: nil)
 
         backgroundColor = .clear
         clipsToBounds = true
-        set(backgroundStyle: .lawrence, isFirst: true, isLast: true)
+        set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
 
         CellBuilder.build(cell: self, elements: [.text, .text, .margin8, .image20, .spinner20])
 
         bind(index: 0) { (component: TextComponent) in
-            component.set(style: .d1)
+            component.font = .subhead2
+            component.textColor = .themeGray
             component.text = "send.fee".localized
         }
 
@@ -29,7 +38,8 @@ class EditableFeeCell: BaseSelectableThemeCell {
             self?.bind(index: 1) { (component: TextComponent) in
                 if let value = value {
                     component.isHidden = false
-                    component.set(style: value.type.style)
+                    component.font = .subhead1
+                    component.textColor = value.type.textColor
                     component.text = value.text
                 } else {
                     component.isHidden = true
@@ -38,6 +48,7 @@ class EditableFeeCell: BaseSelectableThemeCell {
         }
 
         subscribe(disposeBag, viewModel.editButtonVisibleDriver) { [weak self] visible in
+            self?.selectionStyle = visible ? .default : .none
             self?.bind(index: 2) { (component: ImageComponent) in
                 component.isHidden = !visible
             }
@@ -57,7 +68,7 @@ class EditableFeeCell: BaseSelectableThemeCell {
     }
 
     required init?(coder aDecoder: NSCoder) {
-        super.init(coder: aDecoder)
+        fatalError("init(coder:) has not been implemented")
     }
 
 }

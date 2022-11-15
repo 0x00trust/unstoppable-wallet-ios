@@ -1,7 +1,8 @@
+import Foundation
 import BitcoinCore
 import BinanceChainKit
-import Erc20Kit
-import EthereumKit
+import Eip20Kit
+import EvmKit
 import HdWalletKit
 import Hodler
 import HsToolKit
@@ -32,6 +33,17 @@ extension NetworkManager.RequestError: ConvertibleError {
     var convertedError: Error {
         switch self {
         case .noResponse: return AppError.noConnection
+        case .invalidResponse(let statusCode, let data):
+            let description: String?
+            switch data {
+            case let data as Data: description = String(data: data, encoding: .utf8)
+            case let data as String: description = data
+            case let data as CustomStringConvertible: description = data.description
+            default: description = nil
+            }
+
+            let descriptionResponse = [statusCode.description, description].compactMap { $0 }.joined(separator: ": ")
+            return AppError.invalidResponse(reason: descriptionResponse)
         default: return self
         }
     }
@@ -52,6 +64,8 @@ extension BinanceError: ConvertibleError {
 extension Mnemonic.ValidationError: ConvertibleError {
     var convertedError: Error {
         switch self {
+        case .invalidWords(count: let count):
+            return AppError.invalidWords(count: count)
         case .invalidChecksum:
             return AppError.wordsChecksum
         default:
@@ -68,7 +82,7 @@ extension ReachabilityManager.ReachabilityError: ConvertibleError {
     }
 }
 
-extension EthereumKit.Kit.SyncError: ConvertibleError {
+extension EvmKit.Kit.SyncError: ConvertibleError {
     var convertedError: Error {
         switch self {
         case .noNetworkConnection: return AppError.noConnection
@@ -77,7 +91,7 @@ extension EthereumKit.Kit.SyncError: ConvertibleError {
     }
 }
 
-extension EthereumKit.Address.ValidationError: ConvertibleError {
+extension EvmKit.Address.ValidationError: ConvertibleError {
     var convertedError: Error {
          AppError.addressInvalid
     }
@@ -107,7 +121,7 @@ extension HsToolKit.WebSocketStateError: ConvertibleError {
     }
 }
 
-extension EthereumKit.JsonRpcResponse.ResponseError: ConvertibleError {
+extension EvmKit.JsonRpcResponse.ResponseError: ConvertibleError {
 
     var convertedError: Error {
         switch self {

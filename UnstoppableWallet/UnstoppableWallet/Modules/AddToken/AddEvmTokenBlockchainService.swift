@@ -1,20 +1,20 @@
 import Foundation
 import RxSwift
 import Alamofire
-import EthereumKit
+import EvmKit
 import ObjectMapper
 import HsToolKit
 import MarketKit
 
 class AddEvmTokenBlockchainService {
-    private let apiUrl = "https://markets-dev.horizontalsystems.xyz"
-
-    private let blockchain: EvmBlockchain
+    private let blockchain: Blockchain
     private let networkManager: NetworkManager
+    private let apiUrl: String
 
-    init(blockchain: EvmBlockchain, networkManager: NetworkManager) {
+    init(blockchain: Blockchain, networkManager: NetworkManager, appConfigProvider: AppConfigProvider) {
         self.blockchain = blockchain
         self.networkManager = networkManager
+        apiUrl = appConfigProvider.marketApiUrl
     }
 
 }
@@ -23,33 +23,35 @@ extension AddEvmTokenBlockchainService: IAddTokenBlockchainService {
 
     func isValid(reference: String) -> Bool {
         do {
-            _ = try EthereumKit.Address(hex: reference)
+            _ = try EvmKit.Address(hex: reference)
             return true
         } catch {
             return false
         }
     }
 
-    func coinType(reference: String) -> CoinType {
-        blockchain.evm20CoinType(address: reference.lowercased())
+    func tokenQuery(reference: String) -> TokenQuery {
+        TokenQuery(blockchainType: blockchain.type, tokenType: .eip20(address: reference.lowercased()))
     }
 
-    func customTokenSingle(reference: String) -> Single<CustomToken> {
+    func tokenSingle(reference: String) -> Single<Token> {
         let reference = reference.lowercased()
 
         let parameters: Parameters = [
-            "address": reference
+            "blockchain": blockchain.uid,
+            "address": reference,
         ]
 
-        let url = "\(apiUrl)/v1/token_info/\(blockchain.apiPath)"
+        let url = "\(apiUrl)/v1/token_info/eip20"
         let request = networkManager.session.request(url, parameters: parameters)
-        let coinType = coinType(reference: reference)
+        let tokenQuery = tokenQuery(reference: reference)
+        let blockchain = blockchain
 
         return networkManager.single(request: request).map { (tokenInfo: TokenInfo) in
-            CustomToken(
-                    coinName: tokenInfo.name,
-                    coinCode: tokenInfo.symbol,
-                    coinType: coinType,
+            Token(
+                    coin: Coin(uid: tokenQuery.customCoinUid, name: tokenInfo.name, code: tokenInfo.symbol),
+                    blockchain: blockchain,
+                    type: tokenQuery.tokenType,
                     decimals: tokenInfo.decimals
             )
         }
@@ -68,18 +70,6 @@ extension AddEvmTokenBlockchainService {
             name = try map.value("name")
             symbol = try map.value("symbol")
             decimals = try map.value("decimals")
-        }
-    }
-
-}
-
-extension EvmBlockchain {
-
-    var apiPath: String {
-        switch self {
-        case .ethereum: return "erc20"
-        case .binanceSmartChain: return "bep20"
-        case .polygon: return "mrc20"
         }
     }
 

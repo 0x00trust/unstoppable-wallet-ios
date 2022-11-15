@@ -4,19 +4,13 @@ import RxSwift
 import RxRelay
 
 class RestoreMnemonicService {
-    private let wordsManager: IWordsManager
-
-    private let wordList = Mnemonic.wordList(for: .english).map(String.init)
+    private var wordList: [String] = Mnemonic.wordList(for: .english).map(String.init)
     private let passphraseEnabledRelay = BehaviorRelay<Bool>(value: false)
-    private let passphraseValidator: PassphraseValidator
+
+    private let regex = try! NSRegularExpression(pattern: "\\S+")
+    private(set) var items: [WordItem] = []
 
     var passphrase: String = ""
-
-    init(wordsManager: IWordsManager, passphraseValidator: PassphraseValidator) {
-        self.wordsManager = wordsManager
-        self.passphraseValidator = passphraseValidator
-    }
-
 }
 
 extension RestoreMnemonicService {
@@ -29,32 +23,71 @@ extension RestoreMnemonicService {
         passphraseEnabledRelay.asObservable()
     }
 
+    func set(language: String?) {
+        var mnemonicLanguage: Mnemonic.Language = .english
+
+        if let language = language {
+            if language.hasPrefix("ja-") { mnemonicLanguage = .japanese }
+            else if language.hasPrefix("ko-") { mnemonicLanguage = .korean }
+            else if language.hasPrefix("es-") { mnemonicLanguage = .spanish }
+            else if language == "zh-Hans" { mnemonicLanguage = .simplifiedChinese }
+            else if language == "zh-Hant" { mnemonicLanguage = .traditionalChinese }
+            else if language.hasPrefix("fr-") { mnemonicLanguage = .french }
+            else if language.hasPrefix("it-") { mnemonicLanguage = .italian }
+            else if language.hasPrefix("cs-") { mnemonicLanguage = .czech }
+            else if language.hasPrefix("pt-") { mnemonicLanguage = .portuguese }
+        }
+
+        wordList = Mnemonic.wordList(for: mnemonicLanguage).map(String.init)
+    }
+
+    func syncItems(text: String) {
+        let matches = regex.matches(in: text, range: NSRange(location: 0, length: (text as NSString).length))
+
+        items = matches.compactMap { match in
+            guard let range = Range(match.range, in: text) else {
+                return nil
+            }
+
+            let word = String(text[range]).lowercased()
+
+            let type: WordItemType
+
+            if wordList.contains(word) {
+                type = .correct
+            } else if wordList.contains(where: { $0.hasPrefix(word) }) {
+                type = .correctPrefix
+            } else {
+                type = .incorrect
+            }
+
+            return WordItem(word: word, range: match.range, type: type)
+        }
+    }
+
+    func possibleWords(string: String) -> [String] {
+        wordList.filter { $0.hasPrefix(string) }
+    }
+
     func set(passphraseEnabled: Bool) {
         passphraseEnabledRelay.accept(passphraseEnabled)
     }
 
-    func doesWordExist(word: String) -> Bool {
-        wordList.contains(word)
-    }
-
-    func doesWordPartiallyExist(word: String) -> Bool {
-        wordList.contains { $0.hasPrefix(word) }
-    }
-
-    func validate(text: String?) -> Bool {
-        passphraseValidator.validate(text: text)
-    }
-
     func accountType(words: [String]) throws -> AccountType {
+        var errors = [Error]()
         if passphraseEnabled, passphrase.isEmpty {
-            throw RestoreError.emptyPassphrase
+            errors.append(RestoreError.emptyPassphrase)
         }
 
-        guard words.count == 12 || words.count == 24 else {
-            throw ValidationError.invalidWordsCount(count: words.count)
+        do {
+            try Mnemonic.validate(words: words)
+        } catch {
+            errors.append(error)
         }
 
-        try Mnemonic.validate(words: words)
+        guard errors.isEmpty else {
+            throw ErrorList.errors(errors)
+        }
 
         return .mnemonic(words: words, salt: passphrase)
     }
@@ -63,20 +96,24 @@ extension RestoreMnemonicService {
 
 extension RestoreMnemonicService {
 
+    enum WordItemType {
+        case correct
+        case incorrect
+        case correctPrefix
+    }
+
+    struct WordItem {
+        let word: String
+        let range: NSRange
+        let type: WordItemType
+    }
+
     enum RestoreError: Error {
         case emptyPassphrase
     }
 
-    enum ValidationError: LocalizedError {
-        case invalidWordsCount(count: Int)
-
-        public var errorDescription: String? {
-            switch self {
-            case .invalidWordsCount(let count):
-                return "restore_error.mnemonic_word_count".localized("\(count)")
-            }
-        }
-
+    enum ErrorList: Error {
+        case errors([Error])
     }
 
 }

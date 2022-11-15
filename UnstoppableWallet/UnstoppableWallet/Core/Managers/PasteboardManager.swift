@@ -1,14 +1,14 @@
 import UIKit
 import ComponentKit
 
-class PasteboardManager: IPasteboardManager {
+class PasteboardManager {
 
     var value: String? {
-        return UIPasteboard.general.string
+        UIPasteboard.general.string
     }
 
     func set(value: String) {
-        UIPasteboard.general.setValue(value, forPasteboardType: "public.plain-text")
+        UIPasteboard.general.string = value
     }
 
 }
@@ -16,8 +16,8 @@ class PasteboardManager: IPasteboardManager {
 class CopyHelper {
 
     static func copyAndNotify(value: String) {
-        UIPasteboard.general.setValue(value, forPasteboardType: "public.plain-text")
-        HudHelper.instance.showSuccess(title: "alert.copied".localized)
+        UIPasteboard.general.string = value
+        HudHelper.instance.show(banner: .copied)
     }
 
 }

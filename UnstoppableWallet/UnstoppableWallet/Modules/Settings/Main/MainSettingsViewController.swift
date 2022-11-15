@@ -11,7 +11,7 @@ import ComponentKit
 
 class MainSettingsViewController: ThemeViewController {
     private let viewModel: MainSettingsViewModel
-    private var urlManager: IUrlManager
+    private var urlManager: UrlManager
 
     private let disposeBag = DisposeBag()
 
@@ -20,16 +20,14 @@ class MainSettingsViewController: ThemeViewController {
     private let manageAccountsCell = BaseSelectableThemeCell()
     private let securityCenterCell = BaseSelectableThemeCell()
     private let walletConnectCell = BaseSelectableThemeCell()
-    private let launchScreenCell = BaseSelectableThemeCell()
+    private let appearanceCell = BaseSelectableThemeCell()
     private let baseCurrencyCell = BaseSelectableThemeCell()
     private let languageCell = BaseSelectableThemeCell()
     private let themeModeCell = BaseSelectableThemeCell()
     private let aboutCell = BaseSelectableThemeCell()
     private let footerCell = MainSettingsFooterCell()
 
-    private let titleStyle: TextComponent.Style = .b2
-
-    init(viewModel: MainSettingsViewModel, urlManager: IUrlManager) {
+    init(viewModel: MainSettingsViewModel, urlManager: UrlManager) {
         self.viewModel = viewModel
         self.urlManager = urlManager
 
@@ -47,8 +45,6 @@ class MainSettingsViewController: ThemeViewController {
 
         title = "settings.title".localized
         navigationItem.backBarButtonItem = UIBarButtonItem(title: title, style: .plain, target: nil, action: nil)
-
-        tableView.registerCell(forClass: A1Cell.self)
 
         tableView.sectionDataSource = self
 
@@ -69,8 +65,8 @@ class MainSettingsViewController: ThemeViewController {
         walletConnectCell.set(backgroundStyle: .lawrence, isFirst: true, isLast: true)
         buildTitleValue(cell: walletConnectCell, image: UIImage(named: "wallet_connect_20"), title: "wallet_connect.title".localized)
 
-        launchScreenCell.set(backgroundStyle: .lawrence, isFirst: true)
-        buildTitleValue(cell: launchScreenCell, image: UIImage(named: "screen_20"), title: "settings.launch_screen.title".localized)
+        appearanceCell.set(backgroundStyle: .lawrence, isFirst: true)
+        buildTitleValue(cell: appearanceCell, image: UIImage(named: "brush_20"), title: "appearance.title".localized)
 
         baseCurrencyCell.set(backgroundStyle: .lawrence)
         buildTitleValue(cell: baseCurrencyCell, image: UIImage(named: "usd_20"), title: "settings.base_currency".localized)
@@ -80,9 +76,6 @@ class MainSettingsViewController: ThemeViewController {
         languageCell.bind(index: 2) { (component: TextComponent) in
             component.text = viewModel.currentLanguage
         }
-
-        themeModeCell.set(backgroundStyle: .lawrence)
-        buildTitleValue(cell: themeModeCell, image: UIImage(named: "light_20"), title: "settings.theme".localized)
 
         aboutCell.set(backgroundStyle: .lawrence, isFirst: true, isLast: true)
         buildTitleImage(cell: aboutCell, image: UIImage(named: "uw_20"), title: "settings.about_app.title".localized)
@@ -109,19 +102,9 @@ class MainSettingsViewController: ThemeViewController {
                 component.text = count
             }
         }
-        subscribe(disposeBag, viewModel.launchScreenDriver) { [weak self] launchScreen in
-            self?.launchScreenCell.bind(index: 2) { (component: TextComponent) in
-                component.text = launchScreen
-            }
-        }
         subscribe(disposeBag, viewModel.baseCurrencyDriver) { [weak self] baseCurrency in
             self?.baseCurrencyCell.bind(index: 2) { (component: TextComponent) in
                 component.text = baseCurrency
-            }
-        }
-        subscribe(disposeBag, viewModel.themeModeDriver) { [weak self] themeMode in
-            self?.themeModeCell.bind(index: 2) { (component: TextComponent) in
-                component.text = themeMode.description
             }
         }
         subscribe(disposeBag, viewModel.aboutAlertDriver) { [weak self] alert in
@@ -149,7 +132,8 @@ class MainSettingsViewController: ThemeViewController {
             component.imageView.image = image
         }
         cell.bind(index: 1) { (component: TextComponent) in
-            component.set(style: titleStyle)
+            component.font = .body
+            component.textColor = .themeLeah
             component.text = title
         }
         cell.bind(index: 3) { (component: ImageComponent) in
@@ -163,11 +147,13 @@ class MainSettingsViewController: ThemeViewController {
             component.imageView.image = image
         }
         cell.bind(index: 1) { (component: TextComponent) in
-            component.set(style: titleStyle)
+            component.font = .body
+            component.textColor = .themeLeah
             component.text = title
         }
         cell.bind(index: 2) { (component: TextComponent) in
-            component.set(style: .c1)
+            component.font = .subhead1
+            component.textColor = .themeGray
         }
         cell.bind(index: 3) { (component: ImageComponent) in
             component.imageView.image = UIImage(named: "arrow_big_forward_20")
@@ -189,7 +175,7 @@ class MainSettingsViewController: ThemeViewController {
                     id: "security-center",
                     height: .heightCell48,
                     action: { [weak self] in
-                        self?.navigationController?.pushViewController(SecuritySettingsRouter.module(), animated: true)
+                        self?.navigationController?.pushViewController(SecuritySettingsModule.viewController(), animated: true)
                     }
             )
         ]
@@ -212,11 +198,11 @@ class MainSettingsViewController: ThemeViewController {
     private var appearanceRows: [RowProtocol] {
         [
             StaticRow(
-                    cell: launchScreenCell,
+                    cell: appearanceCell,
                     id: "launch-screen",
                     height: .heightCell48,
                     action: { [weak self] in
-                        self?.navigationController?.pushViewController(LaunchScreenModule.viewController(), animated: true)
+                        self?.navigationController?.pushViewController(AppearanceModule.viewController(), animated: true)
                     }
             ),
             StaticRow(
@@ -236,23 +222,12 @@ class MainSettingsViewController: ThemeViewController {
                         self?.navigationController?.pushViewController(module, animated: true)
                     }
             ),
-            StaticRow(
-                    cell: themeModeCell,
-                    id: "theme-mode",
-                    height: .heightCell48,
-                    action: { [weak self] in
-                        self?.navigationController?.pushViewController(ThemeSettingsModule.viewController(), animated: true)
-                    }
-            ),
-            Row<A1Cell>(
+            tableView.imageTitleArrowRow(
                     id: "experimental-features",
-                    height: .heightCell48,
-                    bind: { cell, _ in
-                        cell.set(backgroundStyle: .lawrence, isLast: true)
-                        cell.titleImage = UIImage(named: "flask_20")
-                        cell.title = "settings.experimental_features".localized
-                    },
-                    action: { [weak self] _ in
+                    image: UIImage(named: "flask_20"),
+                    title: "settings.experimental_features".localized,
+                    isLast: true,
+                    action: { [weak self] in
                         self?.navigationController?.pushViewController(ExperimentalFeaturesRouter.module(), animated: true)
                     }
             )
@@ -261,27 +236,21 @@ class MainSettingsViewController: ThemeViewController {
 
     private var knowledgeRows: [RowProtocol] {
         [
-            Row<A1Cell>(
+            tableView.imageTitleArrowRow(
                     id: "faq",
-                    height: .heightCell48,
-                    bind: { cell, _ in
-                        cell.set(backgroundStyle: .lawrence, isFirst: true)
-                        cell.titleImage = UIImage(named: "message_square_20")
-                        cell.title = "settings.faq".localized
-                    },
-                    action: { [weak self] _ in
+                    image: UIImage(named: "message_square_20"),
+                    title: "settings.faq".localized,
+                    isFirst: true,
+                    action: { [weak self] in
                         self?.navigationController?.pushViewController(FaqModule.viewController(), animated: true)
                     }
             ),
-            Row<A1Cell>(
+            tableView.imageTitleArrowRow(
                     id: "academy",
-                    height: .heightCell48,
-                    bind: { cell, _ in
-                        cell.set(backgroundStyle: .lawrence, isLast: true)
-                        cell.titleImage = UIImage(named: "academy_1_20")
-                        cell.title = "guides.title".localized
-                    },
-                    action: { [weak self] _ in
+                    image: UIImage(named: "academy_1_20"),
+                    title: "guides.title".localized,
+                    isLast: true,
+                    action: { [weak self] in
                         self?.navigationController?.pushViewController(GuidesModule.instance(), animated: true)
                     }
             )
@@ -314,9 +283,25 @@ class MainSettingsViewController: ThemeViewController {
     private func openWalletConnect(mode: MainSettingsViewModel.WalletConnectOpenMode) {
         switch mode {
         case .noAccount:
-            present(WalletConnectNoAccountViewController().toBottomSheet, animated: true)
-        case .watchAccount:
-            present(WalletConnectWatchAccountViewController(sourceViewController: self).toBottomSheet, animated: true)
+            let viewController = InformationModule.simpleInfo(
+                    title: "wallet_connect.title".localized,
+                    image: UIImage(named: "wallet_connect_24")?.withTintColor(.themeJacob),
+                    description: "wallet_connect.no_account.description".localized,
+                    buttonTitle: "wallet_connect.no_account.i_understand".localized,
+                    onTapButton: InformationModule.afterClose())
+
+            present(viewController, animated: true)
+        case .nonSupportedAccountType(let accountTypeDescription):
+            let viewController = InformationModule.simpleInfo(
+                    title: "wallet_connect.title".localized,
+                    image: UIImage(named: "wallet_connect_24")?.withTintColor(.themeJacob),
+                    description: "wallet_connect.non_supported_account.description".localized(accountTypeDescription),
+                    buttonTitle: "wallet_connect.non_supported_account.switch".localized,
+                    onTapButton: InformationModule.afterClose { [weak self] in
+                        self?.present(SwitchAccountModule.viewController(), animated: true)
+                    })
+
+            present(viewController, animated: true)
         case .list:
             navigationController?.pushViewController(WalletConnectListModule.viewController(), animated: true)
         }

@@ -1,21 +1,46 @@
+import Foundation
 import DashKit
 import RxSwift
 import HsToolKit
+import BitcoinCore
+import MarketKit
+import HdWalletKit
 
 class DashAdapter: BitcoinBaseAdapter {
     private let feeRate = 1
 
-    private let dashKit: Kit
+    private let dashKit: DashKit.Kit
 
-    init(wallet: Wallet, syncMode: SyncMode, testMode: Bool) throws {
-        guard let seed = wallet.account.type.mnemonicSeed else {
-            throw AdapterError.unsupportedAccount
-        }
-
-        let networkType: Kit.NetworkType = testMode ? .testNet : .mainNet
+    init(wallet: Wallet, syncMode: BitcoinCore.SyncMode, testMode: Bool) throws {
+        let networkType: DashKit.Kit.NetworkType = testMode ? .testNet : .mainNet
         let logger = App.shared.logger.scoped(with: "DashKit")
 
-        dashKit = try Kit(seed: seed, walletId: wallet.account.id, syncMode: BitcoinBaseAdapter.kitMode(from: syncMode), networkType: networkType, confirmationsThreshold: BitcoinBaseAdapter.confirmationsThreshold, logger: logger)
+        switch wallet.account.type {
+        case let .mnemonic(words, salt):
+            guard let seed = Mnemonic.seed(mnemonic: words, passphrase: salt) else {
+                throw AdapterError.unsupportedAccount
+            }
+
+            dashKit = try DashKit.Kit(
+                    seed: seed,
+                    walletId: wallet.account.id,
+                    syncMode: syncMode,
+                    networkType: networkType,
+                    confirmationsThreshold: BitcoinBaseAdapter.confirmationsThreshold,
+                    logger: logger
+            )
+        case let .hdExtendedKey(key):
+            dashKit = try DashKit.Kit(
+                    extendedKey: key,
+                    walletId: wallet.account.id,
+                    syncMode: syncMode,
+                    networkType: networkType,
+                    confirmationsThreshold: BitcoinBaseAdapter.confirmationsThreshold,
+                    logger: logger
+            )
+        default:
+            throw AdapterError.unsupportedAccount
+        }
 
         super.init(abstractKit: dashKit, wallet: wallet, testMode: testMode)
 
@@ -49,22 +74,10 @@ extension DashAdapter: DashKitDelegate {
 
 }
 
-extension DashAdapter: ISendDashAdapter {
+extension DashAdapter: ISendBitcoinAdapter {
 
-    func availableBalance(address: String?) -> Decimal {
-        availableBalance(feeRate: feeRate, address: address)
-    }
-
-    func validate(address: String) throws {
-        try validate(address: address, pluginData: [:])
-    }
-
-    func fee(amount: Decimal, address: String?) -> Decimal {
-        fee(amount: amount, feeRate: feeRate, address: address)
-    }
-
-    func sendSingle(amount: Decimal, address: String, sortMode: TransactionDataSortMode, logger: Logger) -> Single<Void> {
-        sendSingle(amount: amount, address: address, feeRate: feeRate, sortMode: sortMode, logger: logger)
+    var blockchainType: BlockchainType {
+        .dash
     }
 
 }

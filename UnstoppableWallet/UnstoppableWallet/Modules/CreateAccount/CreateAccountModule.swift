@@ -1,36 +1,27 @@
 import UIKit
 import ThemeKit
+import LanguageKit
 
 struct CreateAccountModule {
 
-    static func viewController() -> UIViewController {
+    static func viewController(sourceViewController: UIViewController?, listener: ICreateAccountListener? = nil) -> UIViewController {
         let service = CreateAccountService(
                 accountFactory: App.shared.accountFactory,
-                wordsManager: App.shared.wordsManager,
+                predefinedBlockchainService: App.shared.predefinedBlockchainService,
+                languageManager: LanguageManager.shared,
                 accountManager: App.shared.accountManager,
                 walletManager: App.shared.walletManager,
-                passphraseValidator: PassphraseValidator(),
                 marketKit: App.shared.marketKit
         )
         let viewModel = CreateAccountViewModel(service: service)
-        let viewController = CreateAccountViewController(viewModel: viewModel)
+        let viewController = CreateAccountViewController(viewModel: viewModel, listener: listener)
 
-        return ThemeNavigationController(rootViewController: viewController)
-    }
+        let module = ThemeNavigationController(rootViewController: viewController)
 
-}
-
-extension CreateAccountModule {
-
-    enum Kind: CaseIterable {
-        case mnemonic12
-        case mnemonic24
-
-        var title: String {
-            switch self {
-            case .mnemonic12: return "create_wallet.n_words".localized("12")
-            case .mnemonic24: return "create_wallet.n_words".localized("24")
-            }
+        if App.shared.termsManager.termsAccepted {
+            return module
+        } else {
+            return TermsModule.viewController(sourceViewController: sourceViewController, moduleToOpen: module)
         }
     }
 

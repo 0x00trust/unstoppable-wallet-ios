@@ -10,6 +10,8 @@ class AccountManager {
     private let accountDeletedRelay = PublishRelay<Account>()
     private let accountsLostRelay = BehaviorRelay<Bool>(value: false)
 
+    private var lastCreatedAccount: Account?
+
     init(storage: AccountCachedStorage) {
         self.storage = storage
     }
@@ -26,7 +28,7 @@ class AccountManager {
 
 }
 
-extension AccountManager: IAccountManager {
+extension AccountManager {
 
     var activeAccountObservable: Observable<Account?> {
         activeAccountRelay.asObservable()
@@ -133,16 +135,26 @@ extension AccountManager: IAccountManager {
         accountsRelay.accept(storage.accounts)
     }
 
+    func set(lastCreatedAccount: Account) {
+        self.lastCreatedAccount = lastCreatedAccount
+    }
+
+    func popLastCreatedAccount() -> Account? {
+        let account = lastCreatedAccount
+        lastCreatedAccount = nil
+        return account
+    }
+
 }
 
 class AccountCachedStorage {
     private let accountStorage: AccountStorage
-    private let activeAccountStorage: IActiveAccountStorage
+    private let activeAccountStorage: ActiveAccountStorage
 
     private var _accounts: [String: Account]
     private var _activeAccount: Account?
 
-    init(accountStorage: AccountStorage, activeAccountStorage: IActiveAccountStorage) {
+    init(accountStorage: AccountStorage, activeAccountStorage: ActiveAccountStorage) {
         self.accountStorage = accountStorage
         self.activeAccountStorage = activeAccountStorage
 

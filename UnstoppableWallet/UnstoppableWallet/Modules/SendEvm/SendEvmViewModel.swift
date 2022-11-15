@@ -1,6 +1,7 @@
+import Foundation
 import RxSwift
 import RxCocoa
-import EthereumKit
+import EvmKit
 import MarketKit
 
 class SendEvmViewModel {
@@ -35,7 +36,7 @@ class SendEvmViewModel {
             caution = Caution(text: error.smartDescription, type: .error)
         } else if let warning = amountCaution.warning {
             switch warning {
-            case .coinNeededForFee: caution = Caution(text: "send.amount_warning.coin_needed_for_fee".localized(service.sendPlatformCoin.code), type: .warning)
+            case .coinNeededForFee: caution = Caution(text: "send.amount_warning.coin_needed_for_fee".localized(service.sendToken.coin.code), type: .warning)
             }
         }
 
@@ -58,8 +59,8 @@ extension SendEvmViewModel {
         proceedRelay.asSignal()
     }
 
-    var platformCoin: PlatformCoin {
-        service.sendPlatformCoin
+    var token: Token {
+        service.sendToken
     }
 
     func didTapProceed() {

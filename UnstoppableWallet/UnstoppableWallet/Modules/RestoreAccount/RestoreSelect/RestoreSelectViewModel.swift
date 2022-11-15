@@ -21,26 +21,36 @@ class RestoreSelectViewModel {
     }
 
     private func viewItem(item: RestoreSelectService.Item) -> CoinToggleViewModel.ViewItem {
-        let viewItemState: CoinToggleViewModel.ViewItemState
-
-        switch item.state {
-        case let .supported(enabled, hasSettings): viewItemState = .toggleVisible(enabled: enabled, hasSettings: hasSettings)
-        case .unsupported: viewItemState = .toggleHidden
-        }
-
-        return CoinToggleViewModel.ViewItem(
+        CoinToggleViewModel.ViewItem(
                 uid: item.blockchain.uid,
-                imageUrl: "",
-                placeholderImageName: item.blockchain.imageName,
-                title: item.blockchain.title,
-                subtitle: item.blockchain.description,
-                state: viewItemState,
-                blockchainBadge: nil
+                imageUrl: item.blockchain.type.imageUrl,
+                placeholderImageName: nil,
+                title: item.blockchain.name,
+                subtitle: description(blockchainType: item.blockchain.type),
+                state: .toggleVisible(enabled: item.enabled, hasSettings: item.hasSettings)
         )
     }
 
     private func sync(items: [RestoreSelectService.Item]) {
         viewItemsRelay.accept(items.map { viewItem(item: $0) })
+    }
+
+    private func description(blockchainType: BlockchainType) -> String {
+        switch blockchainType {
+        case .bitcoin: return "BTC (BIP44, BIP49, BIP84)"
+        case .ethereum: return "ETH, ERC20 tokens"
+        case .binanceSmartChain: return "BNB, BEP20 tokens"
+        case .polygon: return "MATIC, ERC20 tokens"
+        case .avalanche: return "AVAX, ERC20 tokens"
+        case .optimism: return "L2 chain"
+        case .arbitrumOne: return "L2 chain"
+        case .zcash: return "ZEC"
+        case .dash: return "DASH"
+        case .bitcoinCash: return "BCH (Legacy, CashAddress)"
+        case .litecoin: return "LTC (BIP44, BIP49, BIP84)"
+        case .binanceChain: return "BNB, BEP2 tokens"
+        default: return ""
+        }
     }
 
 }

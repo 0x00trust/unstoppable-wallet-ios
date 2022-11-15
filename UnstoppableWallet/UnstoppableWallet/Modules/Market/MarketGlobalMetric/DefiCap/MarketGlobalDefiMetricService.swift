@@ -23,7 +23,7 @@ class MarketGlobalDefiMetricService: IMarketSingleSortHeaderService {
         }
     }
 
-    let initialMarketField: MarketModule.MarketField = .marketCap
+    let initialMarketFieldIndex: Int = 1
 
     init(marketKit: MarketKit.Kit, currencyKit: CurrencyKit.Kit) {
         self.marketKit = marketKit
@@ -39,7 +39,7 @@ class MarketGlobalDefiMetricService: IMarketSingleSortHeaderService {
             state = .loading
         }
 
-        marketKit.marketInfosSingle(top: MarketModule.MarketTop.top250.rawValue, currencyCode: currency.code, defi: true)
+        marketKit.marketInfosSingle(top: MarketModule.MarketTop.top100.rawValue, currencyCode: currency.code, defi: true)
                 .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .userInitiated))
                 .subscribe(onSuccess: { [weak self] marketInfos in
                     let rankedItems = marketInfos.enumerated().map { index, info in
@@ -110,7 +110,7 @@ extension MarketGlobalDefiMetricService: IMarketListDecoratorService {
         .day
     }
 
-    func onUpdate(marketField: MarketModule.MarketField) {
+    func onUpdate(marketFieldIndex: Int) {
         if case .loaded(let items, _, _) = state {
             stateRelay.accept(.loaded(items: items, softUpdate: false, reorder: false))
         }

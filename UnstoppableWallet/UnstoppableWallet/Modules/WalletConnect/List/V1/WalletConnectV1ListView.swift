@@ -20,8 +20,8 @@ class WalletConnectV1ListView {
 
     func viewDidLoad() {
         subscribe(disposeBag, viewModel.viewItemsDriver) { [weak self] in self?.sync(viewItems: $0) }
-        subscribe(disposeBag, viewModel.showLoadingSignal) { HudHelper.instance.showSpinner(title: "wallet_connect_list.disconnecting".localized, userInteractionEnabled: false) }
-        subscribe(disposeBag, viewModel.showSuccessSignal) { HudHelper.instance.showSuccess(title: $0) }
+        subscribe(disposeBag, viewModel.showLoadingSignal) { HudHelper.instance.show(banner: .disconnectingWalletConnect) }
+        subscribe(disposeBag, viewModel.showSuccessSignal) { HudHelper.instance.show(banner: .disconnectedWalletConnect) }
         subscribe(disposeBag, viewModel.showWalletConnectSessionSignal) { [weak self] in self?.show(session: $0) }
     }
 
@@ -48,53 +48,49 @@ class WalletConnectV1ListView {
         })
     }
 
-    private func header(text: String) -> ViewState<SubtitleHeaderFooterView> {
-        .cellType(
-                hash: text,
-                binder: { view in
-                    view.bind(text: text)
-                },
-                dynamicHeight: { _ in
-                    SubtitleHeaderFooterView.height
-                }
-        )
-    }
-
-    private func footer(hash: String, text: String) -> ViewState<BottomDescriptionHeaderFooterView> {
-        .cellType(
-                hash: hash,
-                binder: { view in
-                    view.bind(text: text)
-                },
-                dynamicHeight: { containerWidth in
-                    BottomDescriptionHeaderFooterView.height(containerWidth: containerWidth, text: text)
-                }
-        )
-    }
-
-    private func section(viewItems: [WalletConnectV1ListViewModel.ViewItem]) -> SectionProtocol {
+    private func section(tableView: SectionsTableView, viewItems: [WalletConnectV1ListViewModel.ViewItem]) -> SectionProtocol {
         Section(
                 id: "section_1",
-                headerState: header(text: "wallet_connect.list.version_text".localized("1.0")),
-                footerState: footer(hash: "section_v1_footer", text: "wallet_connect.list.v1_bottom_text".localized),
+                headerState: tableView.sectionHeader(text: "wallet_connect.list.version_text".localized("1.0")),
+                footerState: tableView.sectionFooter(text: "wallet_connect.list.v1_bottom_text".localized),
                 rows: viewItems.enumerated().map { index, viewItem in
                     let isFirst = index == 0
                     let isLast = index == viewItems.count - 1
                     let rowAction = deleteRowAction(id: viewItem.id)
 
-                    return Row<G1Cell>(
+                    return CellBuilderNew.row(
+                            rootElement: .hStack([
+                                .image24 { component in
+                                    component.imageView.cornerRadius = .cornerRadius4
+                                    component.imageView.layer.cornerCurve = .continuous
+                                    component.setImage(urlString: viewItem.imageUrl, placeholder: nil)
+                                },
+                                .vStackCentered([
+                                    .text { component in
+                                        component.font = .body
+                                        component.textColor = .themeLeah
+                                        component.text = viewItem.title
+                                    },
+                                    .margin(3),
+                                    .text { component in
+                                        component.font = .subhead2
+                                        component.textColor = .themeGray
+                                        component.text = viewItem.description
+                                    }
+                                ]),
+                                .image20 { component in
+                                    component.imageView.image = UIImage(named: "arrow_big_forward_20")?.withTintColor(.themeGray)
+                                }
+                            ]),
+                            tableView: tableView,
                             id: viewItem.id.description,
                             height: .heightDoubleLineCell,
                             autoDeselect: true,
                             rowActionProvider: { [rowAction] },
-                            bind: { cell, _ in
+                            bind: { cell in
                                 cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
-                                cell.titleImageCornerRadius = .cornerRadius4
-                                cell.setTitleImage(urlString: viewItem.imageUrl, placeholder: nil)
-                                cell.title = viewItem.title
-                                cell.subtitle = viewItem.description
                             },
-                            action: { [weak self] _ in
+                            action: { [weak self] in
                                 self?.viewModel.showSession(id: viewItem.id)
                             }
                     )
@@ -106,12 +102,15 @@ class WalletConnectV1ListView {
 
 extension WalletConnectV1ListView {
 
-    var sections: [SectionProtocol] {
+    func sections(tableView: SectionsTableView) -> [SectionProtocol] {
         guard !viewItems.isEmpty else {
             return []
         }
 
-        return [section(viewItems: viewItems)]
+        return [
+            Section(id: "top-margin", headerState: .margin(height: .margin12)),
+            section(tableView: tableView, viewItems: viewItems)
+        ]
     }
 
     var reloadTableSignal: Signal<()> {

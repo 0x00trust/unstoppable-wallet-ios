@@ -1,13 +1,15 @@
 import UIKit
 import ThemeKit
 import RxSwift
-import WalletConnect
+import WalletConnectSign
+import WalletConnectUtils
+import MarketKit
 
 protocol IWalletConnectMainService {
     var activeAccountName: String? { get }
     var appMetaItem: WalletConnectMainModule.AppMetaItem? { get }
-    var allowedBlockchains: [WalletConnectMainModule.Blockchain] { get }
-    var allowedBlockchainsObservable: Observable<[WalletConnectMainModule.Blockchain]> { get }
+    var allowedBlockchains: [WalletConnectMainModule.BlockchainItem] { get }
+    var allowedBlockchainsObservable: Observable<[WalletConnectMainModule.BlockchainItem]> { get }
     var hint: String? { get }
     var state: WalletConnectMainModule.State { get }
     var connectionState: WalletConnectMainModule.ConnectionState { get }
@@ -16,6 +18,7 @@ protocol IWalletConnectMainService {
     var connectionStateObservable: Observable<WalletConnectMainModule.ConnectionState> { get }
     var errorObservable: Observable<Error> { get }
 
+    func select(chainId: Int)
     func toggle(chainId: Int)
     func reconnect()
     func approveSession()
@@ -30,7 +33,7 @@ protocol IWalletConnectMainRequestView {
 struct WalletConnectMainModule {
 
     static func viewController(session: WalletConnectSession, sourceViewController: UIViewController?) -> UIViewController? {
-        let service = WalletConnectV1MainService(
+        let service = try? WalletConnectV1MainService(
                 session: session,
                 manager: App.shared.walletConnectManager,
                 sessionManager: App.shared.walletConnectSessionManager,
@@ -39,12 +42,12 @@ struct WalletConnectMainModule {
                 evmBlockchainManager: App.shared.evmBlockchainManager
         )
 
-        return viewController(service: service, sourceViewController: sourceViewController)
+        return service.flatMap { viewController(service: $0, sourceViewController: sourceViewController) }
     }
 
-    static func viewController(session: Session, sourceViewController: UIViewController?) -> UIViewController? {
+    static func viewController(session: WalletConnectSign.Session, sourceViewController: UIViewController?) -> UIViewController? {
         let service = App.shared.walletConnectV2SessionManager.service
-        let pingService = WalletConnectV2PingService(service: service)
+        let pingService = WalletConnectV2PingService(service: service, socketConnectionService: App.shared.walletConnectV2SocketConnectionService, logger: App.shared.logger)
 
         let mainService = WalletConnectV2MainService(
                 session: session,
@@ -89,9 +92,18 @@ extension WalletConnectMainModule {
         let icons: [String]
     }
 
-    struct Blockchain: Hashable {
+    struct BlockchainSet {
+        static var empty: BlockchainSet = BlockchainSet(items: Set(), methods: Set(), events: Set())
+
+        var items: Set<BlockchainItem>
+        let methods: Set<String>
+        let events: Set<String>
+    }
+
+    struct BlockchainItem: Hashable {
+        let namespace: String
         let chainId: Int
-        let evmBlockchain: EvmBlockchain
+        let blockchain: MarketKit.Blockchain
         let address: String
         let selected: Bool
 
@@ -99,7 +111,7 @@ extension WalletConnectMainModule {
             hasher.combine(chainId)
         }
 
-        static func ==(lhs: Blockchain, rhs: Blockchain) -> Bool {
+        static func ==(lhs: BlockchainItem, rhs: BlockchainItem) -> Bool {
             lhs.chainId == rhs.chainId
         }
 
@@ -110,7 +122,7 @@ extension WalletConnectMainModule {
         case invalid(error: Error)
         case waitingForApproveSession
         case ready
-        case killed
+        case killed(reason: KilledReason)
 
         static func ==(lhs: State, rhs: State) -> Bool {
             switch (lhs, rhs) {
@@ -118,10 +130,16 @@ extension WalletConnectMainModule {
             case (.invalid(let lhsError), .invalid(let rhsError)): return "\(lhsError)" == "\(rhsError)"
             case (.waitingForApproveSession, .waitingForApproveSession): return true
             case (.ready, .ready): return true
-            case (.killed, .killed): return true
+            case (.killed(let reason), .killed(let reason2)): return reason == reason2
             default: return false
             }
         }
+    }
+
+    enum KilledReason: String {
+        case rejectProposal = "reject proposal"
+        case rejectSession = "reject session"
+        case killSession = "kill session"
     }
 
     enum ConnectionState {
@@ -131,6 +149,7 @@ extension WalletConnectMainModule {
     }
 
     enum SessionError: Error {
+        case noAnySupportedChainId
         case unsupportedChainId
         case noSuitableAccount
     }

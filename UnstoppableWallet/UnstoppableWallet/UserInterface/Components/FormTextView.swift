@@ -2,8 +2,29 @@ import UIKit
 import ThemeKit
 import SnapKit
 
-class FormTextView: UIView {
-    private let textViewFont: UIFont = .body
+protocol IFormTextView: UIView {
+    var onChangeHeight: (() -> ())? { get set }
+    var onChangeText: ((String?) -> ())? { get set }
+    var onChangeEditing: ((Bool) -> ())? { get set }
+    var isValidText: ((String) -> Bool)? { get set }
+
+    func becomeFirstResponder() -> Bool
+
+    var text: String? { get set }
+    var textColor: UIColor? { get set }
+    var font: UIFont? { get set }
+    var placeholder: String? { get set }
+    var isEditable: Bool { get set }
+    var keyboardType: UIKeyboardType { get set }
+    var autocapitalizationType: UITextAutocapitalizationType { get set }
+    var autocorrectionType: UITextAutocorrectionType { get set }
+    var textViewInset: UIEdgeInsets { get set }
+
+    func height(containerWidth: CGFloat) -> CGFloat
+}
+
+class FormTextView: UIView, IFormTextView {
+    private var textViewFont: UIFont = .body
 
     private let textView = UITextView()
     private let placeholderLabel = UILabel()
@@ -24,12 +45,10 @@ class FormTextView: UIView {
         textView.delegate = self
         textView.tintColor = .themeInputFieldTintColor
         textView.keyboardAppearance = .themeDefault
-        textView.autocapitalizationType = .none
-        textView.textColor = .themeOz
+        textView.textColor = .themeLeah
         textView.font = textViewFont
         textView.textContainer.lineFragmentPadding = 0
         textView.backgroundColor = .clear
-        textView.autocorrectionType = .no
         textView.isScrollEnabled = false
 
         addSubview(placeholderLabel)
@@ -97,6 +116,15 @@ extension FormTextView {
         set { textView.textColor = newValue }
     }
 
+    var font: UIFont? {
+        get { textView.font }
+        set {
+            textViewFont = newValue ?? textViewFont
+            textView.font = newValue
+            placeholderLabel.font = newValue
+        }
+    }
+
     var placeholder: String? {
         get { placeholderLabel.text }
         set { placeholderLabel.text = newValue }
@@ -120,6 +148,11 @@ extension FormTextView {
     var autocapitalizationType: UITextAutocapitalizationType {
         get { textView.autocapitalizationType }
         set { textView.autocapitalizationType = newValue }
+    }
+
+    var autocorrectionType: UITextAutocorrectionType {
+        get { textView.autocorrectionType }
+        set { textView.autocorrectionType = newValue }
     }
 
     var textViewInset: UIEdgeInsets {

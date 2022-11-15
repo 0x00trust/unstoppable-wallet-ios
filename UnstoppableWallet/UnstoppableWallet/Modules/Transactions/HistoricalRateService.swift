@@ -1,18 +1,19 @@
 import Foundation
 import RxSwift
+import RxRelay
 import MarketKit
 import CurrencyKit
 
 class HistoricalRateService {
-    private var disposeBag = DisposeBag()
+    private let marketKit: MarketKit.Kit
+    private let disposeBag = DisposeBag()
     private var ratesDisposeBag = DisposeBag()
 
-    private var marketKit: MarketKit.Kit
     private var currency: Currency
     private var rates = [RateKey: CurrencyValue]()
 
-    private var rateUpdatedSubject = PublishSubject<(RateKey, CurrencyValue)>()
-    private var ratesChangedSubject = PublishSubject<Void>()
+    private let rateUpdatedRelay = PublishRelay<(RateKey, CurrencyValue)>()
+    private let ratesChangedRelay = PublishRelay<Void>()
 
     private let queue = DispatchQueue(label: "io.horizontalsystems.unstoppable.transactions-historical-rate-service-queue", qos: .userInitiated)
 
@@ -20,20 +21,34 @@ class HistoricalRateService {
         self.marketKit = marketKit
         currency = currencyKit.baseCurrency
 
-        subscribe(disposeBag, currencyKit.baseCurrencyUpdatedObservable) { [weak self] currency in self?.handle(updatedCurrency: currency) }
+        subscribe(disposeBag, currencyKit.baseCurrencyUpdatedObservable) { [weak self] in self?.handleUpdated(currency: $0) }
     }
 
-    private func handle(updatedCurrency: Currency) {
+    private func handleUpdated(currency: Currency) {
         ratesDisposeBag = DisposeBag()
-        currency = updatedCurrency
-        queue.async { self.rates = [:] }
-        ratesChangedSubject.onNext(())
+        ratesChangedRelay.accept(())
+
+        queue.async {
+            self.currency = currency
+            self.rates = [:]
+        }
     }
 
     private func handle(key: RateKey, rate: Decimal) {
-        let rate = CurrencyValue(currency: currency, value: rate)
-        queue.async { self.rates[key] = rate }
-        rateUpdatedSubject.onNext((key, rate))
+        queue.async {
+            let rate = CurrencyValue(currency: self.currency, value: rate)
+            self.rates[key] = rate
+            self.rateUpdatedRelay.accept((key, rate))
+        }
+    }
+
+    private func _fetchRate(key: RateKey) {
+        marketKit.coinHistoricalPriceValueSingle(coinUid: key.token.coin.uid, currencyCode: currency.code, timestamp: key.date.timeIntervalSince1970)
+            .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .utility))
+            .subscribe(onSuccess: { [weak self] decimal in
+                self?.handle(key: key, rate: decimal)
+            })
+            .disposed(by: ratesDisposeBag)
     }
 
 }
@@ -41,42 +56,58 @@ class HistoricalRateService {
 extension HistoricalRateService {
 
     var rateUpdatedObservable: Observable<(RateKey, CurrencyValue)> {
-        rateUpdatedSubject.asObservable()
+        rateUpdatedRelay.asObservable()
     }
 
     var ratesChangedObservable: Observable<Void> {
-        ratesChangedSubject.asObservable()
+        ratesChangedRelay.asObservable()
     }
 
     func rate(key: RateKey) -> CurrencyValue? {
-        queue.sync { rates[key] }
+        queue.sync {
+            if let currencyValue = rates[key] {
+                return currencyValue
+            }
+
+            guard !key.token.isCustom else {
+                return nil
+            }
+
+            if let value = marketKit.coinHistoricalPriceValue(coinUid: key.token.coin.uid, currencyCode: currency.code, timestamp: key.date.timeIntervalSince1970) {
+                let currencyValue = CurrencyValue(currency: currency, value: value)
+                rates[key]  = currencyValue
+                return currencyValue
+            }
+
+            return nil
+        }
     }
 
     func fetchRate(key: RateKey) {
-        if let rate = rates[key] {
-            rateUpdatedSubject.onNext((key, rate))
+        guard !key.token.isCustom else {
             return
         }
 
-        marketKit.coinHistoricalPriceValueSingle(coinUid: key.coin.uid, currencyCode: currency.code, timestamp: key.date.timeIntervalSince1970)
-                .subscribe(onSuccess: { [weak self] decimal in self?.handle(key: key, rate: decimal) })
-                .disposed(by: ratesDisposeBag)
+        queue.async {
+            if self.rates[key] == nil {
+                self._fetchRate(key: key)
+            }
+        }
     }
 
 }
 
 struct RateKey: Hashable {
-
-    let coin: Coin
+    let token: Token
     let date: Date
 
     func hash(into hasher: inout Hasher) {
-        hasher.combine(coin)
+        hasher.combine(token)
         hasher.combine(date)
     }
 
-    static func ==(lhs: RateKey, rhs: RateKey) -> Bool {
-        lhs.coin == rhs.coin && lhs.date == rhs.date
+    static func == (lhs: RateKey, rhs: RateKey) -> Bool {
+        lhs.token == rhs.token && lhs.date == rhs.date
     }
 
 }

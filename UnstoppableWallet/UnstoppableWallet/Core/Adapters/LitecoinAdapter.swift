@@ -1,25 +1,47 @@
 import LitecoinKit
 import BitcoinCore
 import RxSwift
+import MarketKit
+import HdWalletKit
 
 class LitecoinAdapter: BitcoinBaseAdapter {
-    private let litecoinKit: Kit
+    private let litecoinKit: LitecoinKit.Kit
 
-    init(wallet: Wallet, syncMode: SyncMode, testMode: Bool) throws {
-        guard let seed = wallet.account.type.mnemonicSeed else {
-            throw AdapterError.unsupportedAccount
-        }
-
-        guard let walletDerivation = wallet.coinSettings.derivation else {
-            throw AdapterError.wrongParameters
-        }
-
-        let networkType: Kit.NetworkType = testMode ? .testNet : .mainNet
-        let bip = BitcoinBaseAdapter.bip(from: walletDerivation)
-        let syncMode = BitcoinBaseAdapter.kitMode(from: syncMode)
+    init(wallet: Wallet, syncMode: BitcoinCore.SyncMode, testMode: Bool) throws {
+        let networkType: LitecoinKit.Kit.NetworkType = testMode ? .testNet : .mainNet
         let logger = App.shared.logger.scoped(with: "LitecoinKit")
 
-        litecoinKit = try Kit(seed: seed, bip: bip, walletId: wallet.account.id, syncMode: syncMode, networkType: networkType, confirmationsThreshold: BitcoinBaseAdapter.confirmationsThreshold, logger: logger)
+        switch wallet.account.type {
+        case let .mnemonic(words, salt):
+            guard let seed = Mnemonic.seed(mnemonic: words, passphrase: salt) else {
+                throw AdapterError.unsupportedAccount
+            }
+
+            guard let derivation = wallet.coinSettings.derivation else {
+                throw AdapterError.wrongParameters
+            }
+
+            litecoinKit = try LitecoinKit.Kit(
+                    seed: seed,
+                    purpose: derivation.purpose,
+                    walletId: wallet.account.id,
+                    syncMode: syncMode,
+                    networkType: networkType,
+                    confirmationsThreshold: BitcoinBaseAdapter.confirmationsThreshold,
+                    logger: logger
+            )
+        case let .hdExtendedKey(key):
+            litecoinKit = try LitecoinKit.Kit(
+                    extendedKey: key,
+                    walletId: wallet.account.id,
+                    syncMode: syncMode,
+                    networkType: networkType,
+                    confirmationsThreshold: BitcoinBaseAdapter.confirmationsThreshold,
+                    logger: logger
+            )
+        default:
+            throw AdapterError.unsupportedAccount
+        }
 
         super.init(abstractKit: litecoinKit, wallet: wallet, testMode: testMode)
 
@@ -37,6 +59,11 @@ class LitecoinAdapter: BitcoinBaseAdapter {
 }
 
 extension LitecoinAdapter: ISendBitcoinAdapter {
+
+    var blockchainType: BlockchainType {
+        .litecoin
+    }
+
 }
 
 extension LitecoinAdapter {

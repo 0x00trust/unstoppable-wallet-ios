@@ -1,6 +1,7 @@
 import RxSwift
 import RxRelay
 import MarketKit
+import PinKit
 
 class ManageAccountService {
     private let accountRelay = PublishRelay<Account>()
@@ -10,9 +11,10 @@ class ManageAccountService {
         }
     }
 
-    private let accountManager: IAccountManager
+    private let accountManager: AccountManager
     private let walletManager: WalletManager
     private let restoreSettingsManager: RestoreSettingsManager
+    private let pinKit: IPinKit
     private let disposeBag = DisposeBag()
 
     private let stateRelay = PublishRelay<State>()
@@ -26,7 +28,7 @@ class ManageAccountService {
 
     private var newName: String
 
-    init?(accountId: String, accountManager: IAccountManager, walletManager: WalletManager, restoreSettingsManager: RestoreSettingsManager) {
+    init?(accountId: String, accountManager: AccountManager, walletManager: WalletManager, restoreSettingsManager: RestoreSettingsManager, pinKit: IPinKit) {
         guard let account = accountManager.account(id: accountId) else {
             return nil
         }
@@ -35,6 +37,7 @@ class ManageAccountService {
         self.accountManager = accountManager
         self.walletManager = walletManager
         self.restoreSettingsManager = restoreSettingsManager
+        self.pinKit = pinKit
 
         newName = account.name
 
@@ -80,11 +83,15 @@ extension ManageAccountService {
         accountDeletedRelay.asObservable()
     }
 
+    var isPinSet: Bool {
+        pinKit.isPinSet
+    }
+
     var accountSettingsInfo: [(Coin, RestoreSettingType, String)] {
         let accountWallets = walletManager.wallets(account: account)
 
-        return restoreSettingsManager.accountSettingsInfo(account: account).compactMap { coinType, restoreSettingType, value in
-            guard let wallet = accountWallets.first(where: { $0.coinType == coinType }) else {
+        return restoreSettingsManager.accountSettingsInfo(account: account).compactMap { blockchainType, restoreSettingType, value in
+            guard let wallet = accountWallets.first(where: { $0.token.blockchainType == blockchainType }) else {
                 return nil
             }
 

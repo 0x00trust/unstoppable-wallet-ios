@@ -5,6 +5,7 @@ import PinKit
 
 class BlurManager {
     private let coverView = UIView()
+    private let logoImageView = UIImageView()
 
     private let pinKit: IPinKit
     private var shown = false
@@ -21,8 +22,6 @@ class BlurManager {
             maker.center.equalToSuperview()
         }
 
-        let logoImageView = UIImageView()
-
         logoView.addSubview(logoImageView)
         logoImageView.snp.makeConstraints { maker in
             maker.centerX.equalToSuperview()
@@ -30,9 +29,9 @@ class BlurManager {
             maker.size.equalTo(72)
         }
 
-        logoImageView.image = .appIcon
         logoImageView.contentMode = .scaleAspectFill
         logoImageView.cornerRadius = .cornerRadius16
+        logoImageView.layer.cornerCurve = .continuous
         logoImageView.clipsToBounds = true
 
         let logoTitleLabel = UILabel()
@@ -52,6 +51,8 @@ class BlurManager {
     }
 
     private func show() {
+        logoImageView.image = UIImage(named: AppIconManager.currentAppIcon.imageName)
+
         let window = UIApplication.shared.windows.first { $0.isKeyWindow }
         let frame = window?.frame ?? UIScreen.main.bounds
 

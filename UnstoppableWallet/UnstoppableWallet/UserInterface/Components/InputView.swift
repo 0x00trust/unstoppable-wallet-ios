@@ -4,13 +4,21 @@ import SnapKit
 
 class InputView: UIView {
     private let formValidatedView: FormValidatedView
-    private let inputStackView = InputStackView()
+    private let inputStackView: InputStackView
 
-    private let deleteView = InputButtonWrapperView(style: .secondaryIcon)
+    private let deleteView = InputSecondaryCircleButtonWrapperView()
 
     var onChangeText: ((String?) -> ())?
 
-    init() {
+    var isEnabled: Bool = true {
+        didSet {
+            inputStackView.editable = isEnabled
+            deleteView.button.isEnabled = isEnabled
+        }
+    }
+
+    init(singleLine: Bool = false) {
+        inputStackView = InputStackView(singleLine: singleLine)
         formValidatedView = FormValidatedView(contentView: inputStackView)
 
         super.init(frame: .zero)
@@ -22,7 +30,7 @@ class InputView: UIView {
             maker.edges.equalToSuperview()
         }
 
-        deleteView.button.setImage(UIImage(named: "trash_20"), for: .normal)
+        deleteView.button.set(image: UIImage(named: "trash_20"))
         deleteView.onTapButton = { [weak self] in self?.onTapDelete() }
 
         inputStackView.appendSubview(deleteView)
@@ -75,6 +83,21 @@ extension InputView {
             inputStackView.text = newValue
             syncButtonStates()
         }
+    }
+
+    var textColor: UIColor? {
+        get { inputStackView.textColor }
+        set { inputStackView.textColor = newValue }
+    }
+
+    var font: UIFont? {
+        get { inputStackView.font }
+        set { inputStackView.font = newValue }
+    }
+
+    var accessoryEnabled: Bool {
+        get { deleteView.button.isEnabled }
+        set { deleteView.button.isEnabled = newValue }
     }
 
     var keyboardType: UIKeyboardType {

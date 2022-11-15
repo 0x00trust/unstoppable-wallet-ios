@@ -24,7 +24,7 @@ class DepositViewController: ThemeViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        title = "deposit.receive_coin".localized(viewModel.coin.code)
+        title = viewModel.watchAccount ? "deposit.address".localized : "deposit.receive_coin".localized(viewModel.coin.code)
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "button.close".localized, style: .plain, target: self, action: #selector(onTapClose))
 
         let imageView = UIImageView()
@@ -32,9 +32,13 @@ class DepositViewController: ThemeViewController {
 
         imageView.kf.setImage(
                 with: URL(string: viewModel.coin.imageUrl),
-                placeholder: UIImage(named: viewModel.coinType.placeholderImageName),
+                placeholder: UIImage(named: viewModel.placeholderImageName),
                 options: [.scaleFactor(UIScreen.main.scale)]
         )
+
+        imageView.snp.makeConstraints { maker in
+            maker.size.equalTo(CGFloat.iconSize24)
+        }
 
         let topWrapperView = UIView()
 
@@ -67,6 +71,7 @@ class DepositViewController: ThemeViewController {
         qrCodeImageView.contentMode = .center
         qrCodeImageView.clipsToBounds = true
         qrCodeImageView.layer.cornerRadius = .cornerRadius8
+        qrCodeImageView.layer.cornerCurve = .continuous
 
         let qrCodeRecognizer = UITapGestureRecognizer(target: self, action: #selector(onTapCopy))
         qrCodeImageView.addGestureRecognizer(qrCodeRecognizer)
@@ -104,7 +109,7 @@ class DepositViewController: ThemeViewController {
         addressTitleLabel.font = .subhead2
         addressTitleLabel.textColor = viewModel.isMainNet ? .themeGray : .themeLucian
 
-        var addressTitle = "deposit.your_address".localized
+        var addressTitle = viewModel.watchAccount ? "deposit.address".localized : "deposit.your_address".localized
 
         if let additionalInfo = viewModel.additionalInfo {
             addressTitle += " (\(additionalInfo))"
@@ -139,7 +144,7 @@ class DepositViewController: ThemeViewController {
         addressLabel.textColor = .themeBran
         addressLabel.text = viewModel.address
 
-        let copyButton = ThemeButton()
+        let copyButton = PrimaryButton()
 
         view.addSubview(copyButton)
         copyButton.snp.makeConstraints { maker in
@@ -147,11 +152,11 @@ class DepositViewController: ThemeViewController {
             maker.leading.trailing.equalToSuperview().inset(CGFloat.margin16)
         }
 
-        copyButton.apply(style: .primaryYellow)
+        copyButton.set(style: .yellow)
         copyButton.setTitle("button.copy".localized, for: .normal)
         copyButton.addTarget(self, action: #selector(onTapCopy), for: .touchUpInside)
         copyButton.setContentHuggingPriority(.defaultHigh, for: .vertical)
-        let shareButton = ThemeButton()
+        let shareButton = PrimaryButton()
 
         view.addSubview(shareButton)
         shareButton.snp.makeConstraints { maker in
@@ -160,14 +165,13 @@ class DepositViewController: ThemeViewController {
             maker.bottom.equalToSuperview().inset(44)
         }
 
-        shareButton.apply(style: .primaryGray)
+        shareButton.set(style: .gray)
         shareButton.setTitle("button.share".localized, for: .normal)
         shareButton.addTarget(self, action: #selector(onTapShare), for: .touchUpInside)
     }
 
     @objc private func onTapCopy() {
-        UIPasteboard.general.setValue(viewModel.address, forPasteboardType: "public.plain-text")
-        HudHelper.instance.showSuccess(title: "alert.copied".localized)
+        CopyHelper.copyAndNotify(value: viewModel.address)
     }
 
     @objc private func onTapShare() {

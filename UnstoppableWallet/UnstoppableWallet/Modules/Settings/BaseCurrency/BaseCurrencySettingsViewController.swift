@@ -35,8 +35,6 @@ class BaseCurrencySettingsViewController: ThemeViewController {
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
 
-        tableView.registerCell(forClass: G4Cell.self)
-        tableView.registerHeaderFooter(forClass: SubtitleHeaderFooterView.self)
         tableView.sectionDataSource = self
 
         subscribe(disposeBag, viewModel.disclaimerSignal) { [weak self] in self?.openDisclaimer(codes: $0) }
@@ -46,9 +44,13 @@ class BaseCurrencySettingsViewController: ThemeViewController {
     }
 
     private func openDisclaimer(codes: String) {
-        let viewController = BaseCurrencyDisclaimerViewController(codes: codes) { [weak self] in
+        let title = BottomSheetItem.ComplexTitleViewItem(title: "settings.base_currency.disclaimer".localized, image: UIImage(named: "warning_2_24")?.withTintColor(.themeJacob))
+        let description = InformationModule.Item.description(text: "settings.base_currency.disclaimer.description".localized(codes), isHighlighted: true)
+        let setButton = InformationModule.ButtonItem(style: .yellow, title: "settings.base_currency.disclaimer.set".localized, action: InformationModule.afterClose{ [weak self] in
             self?.viewModel.onAcceptDisclaimer()
-        }
+        })
+        let cancelButton = InformationModule.ButtonItem(style: .transparent, title: "button.cancel".localized, action: InformationModule.afterClose())
+        let viewController = InformationModule.viewController(title: .complex(viewItem: title), items: [description], buttons: [setButton, cancelButton]).toBottomSheet
 
         present(viewController.toBottomSheet, animated: true)
     }
@@ -58,19 +60,37 @@ class BaseCurrencySettingsViewController: ThemeViewController {
 extension BaseCurrencySettingsViewController: SectionsDataSource {
 
     private func row(viewItem: BaseCurrencySettingsViewModel.ViewItem, isFirst: Bool, isLast: Bool) -> RowProtocol {
-        Row<G4Cell>(
+        CellBuilderNew.row(
+                rootElement: .hStack([
+                    .image24 { component in
+                        component.imageView.image = viewItem.icon
+                    },
+                    .vStackCentered([
+                        .text { component in
+                            component.font = .body
+                            component.textColor = .themeLeah
+                            component.text = viewItem.code
+                        },
+                        .margin(3),
+                        .text { component in
+                            component.font = .subhead2
+                            component.textColor = .themeGray
+                            component.text = viewItem.symbol
+                        }
+                    ]),
+                    .image20 { component in
+                        component.isHidden = !viewItem.selected
+                        component.imageView.image = UIImage(named: "check_1_20")?.withTintColor(.themeJacob)
+                    }
+                ]),
+                tableView: tableView,
                 id: viewItem.code,
                 height: .heightDoubleLineCell,
                 autoDeselect: true,
-                bind: { cell, _ in
+                bind: { cell in
                     cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
-                    cell.title = viewItem.code
-                    cell.titleImage = viewItem.icon
-                    cell.subtitle = viewItem.symbol
-                    cell.valueImage = viewItem.selected ? UIImage(named: "check_1_20")?.withRenderingMode(.alwaysTemplate) : nil
-                    cell.valueImageTintColor = .themeJacob
                 },
-                action: { [weak self] _ in
+                action: { [weak self] in
                     self?.viewModel.onSelect(viewItem: viewItem)
                 }
         )
@@ -82,29 +102,17 @@ extension BaseCurrencySettingsViewController: SectionsDataSource {
         }
     }
 
-    private func header(text: String) -> ViewState<SubtitleHeaderFooterView> {
-        .cellType(
-                hash: text,
-                binder: { view in
-                    view.bind(text: text)
-                },
-                dynamicHeight: { containerWidth in
-                    SubtitleHeaderFooterView.height
-                }
-        )
-    }
-
     func buildSections() -> [SectionProtocol] {
         [
             Section(
                     id: "popular",
                     headerState: .margin(height: .margin12),
-                    footerState: .margin(height: .margin12),
+                    footerState: .margin(height: .margin24),
                     rows: rows(viewItems: viewModel.popularViewItems)
             ),
             Section(
                     id: "other",
-                    headerState: header(text: "settings.base_currency.other".localized.uppercased()),
+                    headerState: tableView.sectionHeader(text: "settings.base_currency.other".localized.uppercased()),
                     footerState: .margin(height: .margin32),
                     rows: rows(viewItems: viewModel.otherViewItems)
             ),

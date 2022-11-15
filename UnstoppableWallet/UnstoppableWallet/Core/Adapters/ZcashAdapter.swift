@@ -1,20 +1,20 @@
 import Foundation
-
+import UIKit
 import ZcashLightClientKit
 import RxSwift
 import HdWalletKit
 import HsToolKit
 import MarketKit
+import HsExtensions
 
 class ZcashAdapter {
     private let disposeBag = DisposeBag()
 
-    private static let coinRate = Decimal(ZcashSDK.zatoshiPerZEC)
     var fee: Decimal { defaultFee() }
 
-    private let coin: PlatformCoin
+    private let token: Token
     private let transactionSource: TransactionSource
-    private let localStorage: ILocalStorage = App.shared.localStorage       //temporary decision. Will move to init
+    private let localStorage = App.shared.localStorage       //temporary decision. Will move to init
     private let saplingDownloader = DownloadService(queueLabel: "io.SaplingDownloader")
     private let synchronizer: SDKSynchronizer
     private let transactionPool: ZcashTransactionPool
@@ -28,24 +28,30 @@ class ZcashAdapter {
     private let balanceSubject = PublishSubject<BalanceData>()
     private let transactionRecordsSubject = PublishSubject<[TransactionRecord]>()
 
-    private var lastBlockHeight: Int? = 0
+    private let birthday: BlockHeight
 
-    private(set) var balanceState: AdapterState {
+    private var lastBlockHeight: Int = 0
+
+    private var state: ZCashAdapterState {
         didSet {
-            transactionState = balanceState
             balanceStateSubject.onNext(balanceState)
+            syncing = balanceState.syncing
         }
     }
-    private(set) var transactionState: AdapterState
+
+    var balanceState: AdapterState {
+        state.adapterState
+    }
+    private(set) var syncing: Bool = true
 
     private func defaultFee(height: Int? = nil) -> Decimal {
-        let fee: Int64
+        let fee: Zatoshi
         if let lastBlockHeight = height {
             fee = network.constants.defaultFee(for: lastBlockHeight)
         } else {
             fee = network.constants.defaultFee()
         }
-        return Decimal(fee) / Self.coinRate
+        return fee.decimalValue.decimalValue
     }
 
     init(wallet: Wallet, restoreSettings: RestoreSettings, testMode: Bool) throws {
@@ -55,15 +61,14 @@ class ZcashAdapter {
         network = ZcashNetworkBuilder.network(for: testMode ? .testnet : .mainnet)
         let endPoint = testMode ? "lightwalletd.testnet.electriccoin.co" : "zcash.horizontalsystems.xyz"
 
-        coin = wallet.platformCoin
+        token = wallet.token
         transactionSource = wallet.transactionSource
         uniqueId = wallet.account.id
-        let birthday: Int
         switch wallet.account.origin {
         case .created: birthday = Self.newBirthdayHeight(network: network)
         case .restored:
             if let height = restoreSettings.birthdayHeight {
-                birthday = WalletBirthday.birthday(with: max(height, network.constants.saplingActivationHeight),network: network).height
+                birthday = max(height, network.constants.saplingActivationHeight)
             } else {
                 birthday = network.constants.saplingActivationHeight
             }
@@ -83,7 +88,7 @@ class ZcashAdapter {
         let initializer = Initializer(cacheDbURL:try! ZcashAdapter.cacheDbURL(uniqueId: uniqueId, network: network),
                 dataDbURL: try! ZcashAdapter.dataDbURL(uniqueId: uniqueId, network: network),
                 pendingDbURL: try! ZcashAdapter.pendingDbURL(uniqueId: uniqueId, network: network),
-                endpoint: LightWalletEndpoint(address: endPoint, port: 9067),
+                endpoint: LightWalletEndpoint(address: endPoint, port: 9067, singleCallTimeoutInMillis: 1000000, streamingCallTimeoutInMillis: 1000000),
                 network: network,
                 spendParamsURL: try! ZcashAdapter.spendParamsURL(uniqueId: uniqueId),
                 outputParamsURL: try! ZcashAdapter.outputParamsURL(uniqueId: uniqueId),
@@ -103,9 +108,8 @@ class ZcashAdapter {
         transactionPool = ZcashTransactionPool(receiveAddress: address.zAddress)
         transactionPool.store(confirmedTransactions: synchronizer.clearedTransactions, pendingTransactions: synchronizer.pendingTransactions)
 
-        balanceState = .syncing(progress: 0, lastBlockDate: nil)
-        transactionState = balanceState
-        lastBlockHeight = try? synchronizer.latestHeight()
+        state = .downloadingBlocks(number: 0, lastBlock: lastBlockHeight)
+//        lastBlockHeight = try? synchronizer.latestHeight()
 
         NotificationCenter.default.addObserver(self, selector: #selector(didEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
 
@@ -146,12 +150,18 @@ class ZcashAdapter {
         switch state {
         case .idle: sync()
         case .inProgress(let progress):
-            balanceState = .syncing(progress: Int(progress * 100), lastBlockDate: nil)
+            self.state = .downloadingSapling(progress: Int(progress * 100))
         }
     }
 
+    private func progress(p: BlockProgress) -> Double {
+        let overall = p.targetHeight - birthday
+
+        return Double(overall > 0 ? Float((p.progressHeight - birthday)) / Float(overall) : 0)
+    }
+
     @objc private func statusUpdated(_ notification: Notification) {
-        var newState = balanceState
+        var newState = state
         var blockDate: Date? = nil
         if let blockTime = notification.userInfo?[SDKSynchronizer.NotificationKeys.blockDate] as? Date {
             blockDate = blockTime
@@ -161,23 +171,23 @@ class ZcashAdapter {
         case .stopped: newState = .notSynced(error: AppError.unknownError)
         case .synced: newState = .synced
         case .downloading(let p):
-            newState = .syncing(progress: Int(p.progress * 50), lastBlockDate: blockDate)
+            newState = .downloadingBlocks(number: p.progressHeight, lastBlock: p.targetHeight)
         case .enhancing(let p):
-            newState = .syncing(progress: p.progress, lastBlockDate: blockDate)
+            newState = .enhancingTransactions(number: p.enhancedTransactions, count: p.totalTransactions)
         case .unprepared:
             newState = .notSynced(error: AppError.unknownError)
         case .validating:
             newState = .syncing(progress: 0, lastBlockDate: blockDate)
-        case .scanning(let scanProgress):
-            newState = .syncing(progress: Int(50 + scanProgress.progress * 50), lastBlockDate: blockDate)
+        case .scanning(let p):
+            newState = .scanningBlocks(number: p.progressHeight, lastBlock: p.targetHeight)
         case .fetching:
             newState = .syncing(progress: 0, lastBlockDate: nil)
         case .error:
             newState = .notSynced(error: AppError.unknownError)
         }
 
-        if newState != balanceState {
-            balanceState = newState
+        if newState != state {
+            state = newState
         }
     }
 
@@ -218,7 +228,7 @@ class ZcashAdapter {
         // TODO: Should have it's own transactions with memo
         if transaction.sentTo(address: receiveAddress) {
             return BitcoinIncomingTransactionRecord(
-                    coin: coin,
+                    token: token,
                     source: transactionSource,
                     uid: transaction.transactionHash,
                     transactionHash: transaction.transactionHash,
@@ -231,13 +241,13 @@ class ZcashAdapter {
                     lockInfo: nil,
                     conflictingHash: nil,
                     showRawTransaction: showRawTransaction,
-                    amount: Decimal(transaction.value) / Self.coinRate,
+                    amount: transaction.value.decimalValue.decimalValue,
                     from: nil,
                     memo: transaction.memo
             )
         } else {
             return BitcoinOutgoingTransactionRecord(
-                    coin: coin,
+                    token: token,
                     source: transactionSource,
                     uid: transaction.transactionHash,
                     transactionHash: transaction.transactionHash,
@@ -250,7 +260,7 @@ class ZcashAdapter {
                     lockInfo: nil,
                     conflictingHash: nil,
                     showRawTransaction: showRawTransaction,
-                    amount: Decimal(transaction.value) / Self.coinRate,
+                    amount: transaction.value.decimalValue.decimalValue,
                     to: transaction.toAddress,
                     sentToSelf: false,
                     memo: transaction.memo
@@ -317,13 +327,13 @@ class ZcashAdapter {
     }
 
     private var _balanceData: BalanceData {
-        let verifiedBalance = Decimal(synchronizer.initializer.getVerifiedBalance())
-        let balance = Decimal(synchronizer.initializer.getBalance())
+        let verifiedBalance: Zatoshi = synchronizer.initializer.getVerifiedBalance()
+        let balance: Zatoshi = synchronizer.initializer.getBalance()
         let diff = balance - verifiedBalance
 
         return BalanceData(
-                balance: verifiedBalance / Self.coinRate,
-                balanceLocked: diff / Self.coinRate
+                balance: verifiedBalance.decimalValue.decimalValue,
+                balanceLocked: diff.decimalValue.decimalValue
         )
     }
 
@@ -338,7 +348,7 @@ class ZcashAdapter {
 extension ZcashAdapter {
 
     public static func newBirthdayHeight(network: ZcashNetwork) -> Int {
-        WalletBirthday.birthday(with: BlockHeight.max, network: network).height
+        BlockHeight.ofLatestCheckpoint(network: network)
     }
 
     private static func dataDirectoryUrl() throws -> URL {
@@ -413,7 +423,7 @@ extension ZcashAdapter: IAdapter {
             fixPendingTransactionsIfNeeded()
             try synchronizer.start(retry: retry)
         } catch {
-            balanceState = .notSynced(error: error)
+            state = .notSynced(error: error)
         }
     }
 
@@ -430,8 +440,8 @@ extension ZcashAdapter: IAdapter {
         t-address: \(String(describing: taddress ))
         spendingKeys: \(keys.description)
         shielded balance
-                  total:  \(synchronizer.initializer.getBalance())
-               verified:  \(synchronizer.initializer.getVerifiedBalance())
+                  total:  \(synchronizer.initializer.getBalance().decimalValue.decimalValue)
+               verified:  \(synchronizer.initializer.getVerifiedBalance().decimalValue.decimalValue)
         transparent balance
                      total: \(tBalance == nil ? "failed" : String(describing: tBalance?.total))
                   verified: \(tBalance == nil ? "failed" : String(describing: tBalance?.verified))
@@ -443,10 +453,10 @@ extension ZcashAdapter: IAdapter {
 extension ZcashAdapter: ITransactionsAdapter {
 
     var lastBlockInfo: LastBlockInfo? {
-        lastBlockHeight.map { LastBlockInfo(height: $0, timestamp: nil) }
+        LastBlockInfo(height: lastBlockHeight, timestamp: nil)
     }
 
-    var transactionStateUpdatedObservable: Observable<Void> {
+    var syncingObservable: Observable<Void> {
         balanceStateSubject.map { _ in () }
     }
 
@@ -462,7 +472,7 @@ extension ZcashAdapter: ITransactionsAdapter {
         network.networkType == .mainnet ? "https://blockchair.com/zcash/transaction/" + transactionHash : nil
     }
 
-    func transactionsObservable(coin: PlatformCoin?, filter: TransactionTypeFilter) -> Observable<[TransactionRecord]> {
+    func transactionsObservable(token: Token?, filter: TransactionTypeFilter) -> Observable<[TransactionRecord]> {
         transactionRecordsSubject.asObservable()
                 .map { transactions in
                     transactions.compactMap { transaction -> TransactionRecord? in
@@ -477,14 +487,14 @@ extension ZcashAdapter: ITransactionsAdapter {
                 .filter { !$0.isEmpty }
     }
 
-    func transactionsSingle(from: TransactionRecord?, coin: PlatformCoin?, filter: TransactionTypeFilter, limit: Int) -> Single<[TransactionRecord]> {
+    func transactionsSingle(from: TransactionRecord?, token: Token?, filter: TransactionTypeFilter, limit: Int) -> Single<[TransactionRecord]> {
         transactionPool.transactionsSingle(from: from, filter: filter, limit: limit).map { [weak self] txs in
             txs.compactMap { self?.transactionRecord(fromTransaction: $0) }
         }
     }
 
     func rawTransaction(hash: String) -> String? {
-        transactionPool.transaction(by: hash)?.raw?.hex
+        transactionPool.transaction(by: hash)?.raw?.hs.hex
     }
 
 }
@@ -522,7 +532,7 @@ extension ZcashAdapter: ISendZcashAdapter {
     }
 
     var availableBalance: Decimal {
-        max(0, Decimal(synchronizer.initializer.getVerifiedBalance()) / Self.coinRate - fee)
+        max(0, synchronizer.initializer.getVerifiedBalance().decimalValue.decimalValue - fee)
     }
 
     func validate(address: String) throws -> AddressType {
@@ -553,10 +563,9 @@ extension ZcashAdapter: ISendZcashAdapter {
             return Single.error(AdapterError.unsupportedAccount)
         }
 
-        let handler = NSDecimalNumberHandler(roundingMode: .down, scale: 0, raiseOnExactness: false, raiseOnOverflow: false, raiseOnUnderflow: false, raiseOnDivideByZero: false)
-        let zatoshi = NSDecimalNumber(decimal: amount * Self.coinRate).rounding(accordingToBehavior: handler).int64Value
+        let zatoshi = Zatoshi.from(decimal: amount)
 
-        let synchronizer = self.synchronizer
+        let synchronizer = synchronizer
 
         return Single<()>.create { [weak self] single in
             synchronizer.sendToAddress(spendingKey: spendingKey, zatoshi: zatoshi, toAddress: address, memo: memo, from: 0) { result in
@@ -621,5 +630,45 @@ extension EnhancementProgress {
             return 0
         }
         return Int(Double(self.enhancedTransactions)/Double(self.totalTransactions)) * 100
+    }
+}
+
+enum ZCashAdapterState: Equatable {
+    case synced
+    case syncing(progress: Int?, lastBlockDate: Date?)
+    case downloadingSapling(progress: Int)
+    case downloadingBlocks(number: Int, lastBlock: Int)
+    case scanningBlocks(number: Int, lastBlock: Int)
+    case enhancingTransactions(number: Int, count: Int)
+    case notSynced(error: Error)
+
+    public static func ==(lhs: ZCashAdapterState, rhs: ZCashAdapterState) -> Bool {
+        switch (lhs, rhs) {
+        case (.synced, .synced): return true
+        case (.syncing(let lProgress, let lLastBlockDate), .syncing(let rProgress, let rLastBlockDate)): return lProgress == rProgress && lLastBlockDate == rLastBlockDate
+        case (.downloadingSapling(let lProgress), .downloadingSapling(let rProgress)): return lProgress == rProgress
+        case (.downloadingBlocks(let lNumber, let lLast), .downloadingBlocks(let rNumber, let rLast)): return lNumber == rNumber && lLast == rLast
+        case (.scanningBlocks(let lNumber, let lLast), .scanningBlocks(let rNumber, let rLast)): return lNumber == rNumber && lLast == rLast
+        case (.enhancingTransactions(let lNumber, let lCount), .enhancingTransactions(let rNumber, let rCount)): return lNumber == rNumber && lCount == rCount
+        case (.notSynced, .notSynced): return true
+        default: return false
+        }
+    }
+
+    var adapterState: AdapterState {
+        switch self {
+        case .synced: return .synced
+        case .syncing(let progress, let lastDate): return .syncing(progress: progress, lastBlockDate: lastDate)
+        case .downloadingSapling(let progress):
+            return .customSyncing(main: "Downloading Sapling... \(progress)%", secondary: nil, progress: progress)
+        case .downloadingBlocks(let number, let lastBlock):
+            return .customSyncing(main: "Downloading Blocks", secondary: "\(number)/\(lastBlock)", progress: nil)
+        case .scanningBlocks(let number, let lastBlock):
+            return .customSyncing(main: "Scanning Blocks", secondary: "\(number)/\(lastBlock)", progress: nil)
+        case .enhancingTransactions(let number, let count):
+            let progress: String? = count == 0 ? nil : "\(number)/\(count)"
+            return .customSyncing(main: "Enhancing Transactions", secondary: progress, progress: nil)
+        case .notSynced(let error): return .notSynced(error: error)
+        }
     }
 }

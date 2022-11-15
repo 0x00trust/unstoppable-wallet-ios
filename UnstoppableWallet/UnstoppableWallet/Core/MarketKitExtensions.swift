@@ -1,80 +1,217 @@
 import UIKit
 import MarketKit
+import EvmKit
+import NftKit
 
-extension MarketKit.CoinType {
+enum TokenProtocol {
+    case native
+    case eip20
+    case bep2
+    case spl
+    case unsupported
+}
 
-    var blockchainType: String? {
-        switch self {
-        case .erc20: return "ERC20"
-        case .bep20: return "BEP20"
-        case .polygon, .mrc20: return "POLYGON"
-        case .bep2: return "BEP2"
-        default: return nil
+extension MarketKit.Token {
+
+    var protocolName: String? {
+        tokenQuery.protocolName
+    }
+
+    var isCustom: Bool {
+        coin.uid == tokenQuery.customCoinUid
+    }
+
+    var isSupported: Bool {
+        tokenQuery.isSupported
+    }
+
+    var placeholderImageName: String {
+        "\(blockchainType.uid)_\(type.tokenProtocol)"
+    }
+
+    var swappable: Bool {
+        switch blockchainType {
+        case .ethereum: return true
+        case .binanceSmartChain: return true
+        case .polygon: return true
+        case .avalanche: return true
+        case .optimism: return true
+        case .arbitrumOne: return true
+        default: return false
         }
     }
 
-    var platformType: String {
-        switch self {
-        case .ethereum: return "Ethereum"
-        case .erc20: return "ERC20"
-        case .binanceSmartChain: return "Binance Smart Chain"
-        case .bep20: return "BEP20"
-        case .polygon, .mrc20: return "Polygon"
-        case .bep2: return "BEP2"
+    var protocolInfo: String {
+        switch type {
+        case .native: return blockchain.name
+        case .eip20, .bep2: return protocolName ?? ""
         default: return ""
         }
     }
 
-    var platformCoinType: String {
-        switch self {
-        case .ethereum, .binanceSmartChain, .polygon: return "coin_platforms.native".localized
-        case .erc20(let address): return address.shortenedAddress
-        case .bep20(let address): return address.shortenedAddress
-        case .mrc20(let address): return address.shortenedAddress
+    var typeInfo: String {
+        switch type {
+        case .native:
+            var parts = ["coin_platforms.native".localized]
+
+            switch blockchainType {
+            case .binanceSmartChain: parts.append("(BEP20)")
+            case .binanceChain: parts.append("(BEP2)")
+            default: ()
+            }
+
+            return parts.joined(separator: " ")
+        case .eip20(let address): return address.shortened
         case .bep2(let symbol): return symbol
         default: return ""
         }
     }
 
-    var platformIcon: String? {
-        switch self {
-        case .ethereum, .erc20: return "ethereum_24"
-        case .binanceSmartChain, .bep20: return "binance_smart_chain_24"
-        case .polygon, .mrc20: return "polygon_24"
-        case .bep2: return "binance_chain_24"
+    var copyableTypeInfo: String? {
+        switch type {
+        case .eip20(let address): return address
+        case .bep2(let symbol): return symbol
         default: return nil
         }
     }
 
-    var swappable: Bool {
+}
+
+extension MarketKit.TokenType {
+
+    var tokenProtocol: TokenProtocol {
         switch self {
-        case .ethereum, .erc20, .binanceSmartChain, .bep20, .polygon, .mrc20: return true
+        case .native: return .native
+        case .eip20: return .eip20
+        case .bep2: return .bep2
+        case .spl: return .spl
+        case .unsupported: return .unsupported
+        }
+    }
+
+    var bep2Symbol: String? {
+        switch self {
+        case .bep2(let symbol): return symbol
+        default: return nil
+        }
+    }
+
+    var order: Int {
+        switch self {
+        case .native: return 0
+        default: return 1
+        }
+    }
+
+}
+
+extension MarketKit.TokenQuery {
+
+    var protocolName: String? {
+        blockchainType.protocolName(tokenProtocol: tokenType.tokenProtocol)
+    }
+
+    var customCoinUid: String {
+        "custom-\(id)"
+    }
+
+    var isSupported: Bool {
+        switch (blockchainType, tokenType) {
+        case (.bitcoin, .native): return true
+        case (.bitcoinCash, .native): return true
+        case (.litecoin, .native): return true
+        case (.dash, .native): return true
+        case (.zcash, .native): return true
+        case (.ethereum, .native), (.ethereum, .eip20): return true
+        case (.optimism, .native), (.optimism, .eip20): return true
+        case (.arbitrumOne, .native), (.arbitrumOne, .eip20): return true
+        case (.binanceSmartChain, .native), (.binanceSmartChain, .eip20): return true
+        case (.polygon, .native), (.polygon, .eip20): return true
+        case (.avalanche, .native), (.avalanche, .eip20): return true
+        case (.binanceChain, .native), (.binanceChain, .bep2): return true
         default: return false
         }
     }
 
-    var title: String {
-        switch self {
-        case .bitcoin: return "Bitcoin"
-        case .litecoin: return "Litecoin"
-        case .bitcoinCash: return "Bitcoin Cash"
-        default: return ""
+}
+
+extension MarketKit.Blockchain {
+
+    var shortName: String {
+        switch type {
+        case .binanceSmartChain: return "BSC"
+        default: return name
         }
     }
 
-    var coinSettingTypes: [CoinSettingType] {
-        switch self {
-        case .bitcoin, .litecoin: return [.derivation]
-        case .bitcoinCash: return [.bitcoinCashCoinType]
-        default: return []
+}
+
+extension MarketKit.BlockchainType {
+
+    func protocolName(tokenProtocol: TokenProtocol) -> String? {
+        switch tokenProtocol {
+        case .native:
+            switch self {
+            case .optimism: return "Optimism"
+            case .arbitrumOne: return "Arbitrum"
+            case .binanceChain: return "BEP2"
+            default: return nil
+            }
+        case .eip20:
+            switch self {
+            case .ethereum: return "ERC20"
+            case .binanceSmartChain: return "BEP20"
+            case .polygon: return "Polygon"
+            case .avalanche: return "Avalanche"
+            case .optimism: return "Optimism"
+            case .arbitrumOne: return "Arbitrum"
+            default: return nil
+            }
+        case .bep2:
+            return "BEP2"
+        case .spl:
+            return "SPL"
+        default:
+            return nil
         }
     }
 
-    var defaultSettingsArray: [CoinSettings] {
+    func placeholderImageName(tokenProtocol: TokenProtocol?) -> String {
+        tokenProtocol.map { "\(uid)_\($0)" } ?? "icon_placeholder_24"
+    }
+
+    var iconPlain24: String {
+        "\(uid)_trx_24"
+    }
+
+    var imageUrl: String {
+        let scale = Int(UIScreen.main.scale)
+        return "https://cdn.blocksdecoded.com/blockchain-icons/32px/\(uid)@\(scale)x.png"
+    }
+
+    var coinSettingType: CoinSettingType? {
         switch self {
-        case .bitcoin, .litecoin: return [[.derivation: MnemonicDerivation.bip49.rawValue]]
-        case .bitcoinCash: return [[.bitcoinCashCoinType: BitcoinCashCoinType.type145.rawValue]]
-        default: return []
+        case .bitcoin, .litecoin: return .derivation
+        case .bitcoinCash: return .bitcoinCashCoinType
+        default: return nil
+        }
+    }
+
+    func defaultSettingsArray(accountType: AccountType) -> [CoinSettings] {
+        switch self {
+        case .bitcoin, .litecoin:
+            switch accountType {
+            case .mnemonic:
+                return [[.derivation: MnemonicDerivation.bip49.rawValue]]
+            case .hdExtendedKey(let key):
+                return [[.derivation: key.info.purpose.mnemonicDerivation.rawValue]]
+            default:
+                return []
+            }
+        case .bitcoinCash:
+            return [[.bitcoinCashCoinType: BitcoinCashCoinType.type145.rawValue]]
+        default:
+            return []
         }
     }
 
@@ -85,44 +222,83 @@ extension MarketKit.CoinType {
         }
     }
 
-    var isSupported: Bool {
-        switch self {
-        case .bitcoin, .litecoin, .bitcoinCash, .dash, .ethereum, .zcash, .binanceSmartChain, .polygon, .erc20, .bep20, .bep2, .mrc20: return true
-        default: return false
-        }
-    }
-
-    var placeholderImageName: String {
-        blockchainType.map { "Coin Icon Placeholder - \($0)" } ?? "icon_placeholder_24"
-    }
-
     var order: Int {
         switch self {
         case .bitcoin: return 1
-        case .bitcoinCash: return 2
-        case .litecoin: return 3
-        case .dash: return 4
-        case .zcash: return 5
-        case .ethereum: return 6
-        case .binanceSmartChain: return 7
-        case .polygon: return 8
-        case .erc20: return 9
-        case .bep20: return 10
-        case .mrc20: return 11
-        case .bep2: return 12
-        case .solana: return 13
-        case .avalanche: return 14
-        case .fantom: return 15
-        case .arbitrumOne: return 16
-        case .huobiToken: return 17
-        case .harmonyShard0: return 18
-        case .xdai: return 19
-        case .moonriver: return 20
-        case .okexChain: return 21
-        case .sora: return 22
-        case .tomochain: return 23
-        case .iotex: return 24
+        case .ethereum: return 2
+        case .binanceSmartChain: return 3
+        case .polygon: return 4
+        case .avalanche: return 5
+        case .zcash: return 6
+        case .dash: return 7
+        case .bitcoinCash: return 8
+        case .litecoin: return 9
+        case .binanceChain: return 10
+        case .arbitrumOne: return 11
+        case .optimism: return 12
         default: return Int.max
+        }
+    }
+
+    var resendable: Bool {
+        switch self {
+        case .optimism, .arbitrumOne: return false
+        default: return true
+        }
+    }
+
+    var rollupFeeContractAddress: EvmKit.Address? {
+        switch self {
+        case .optimism: return try? EvmKit.Address(hex: "0x420000000000000000000000000000000000000F")
+        default: return nil
+        }
+    }
+
+    // used for EVM blockchains only
+    var feePriceScale: FeePriceScale {
+        switch self {
+        case .avalanche: return .nAvax
+        default: return .gwei
+        }
+    }
+
+    // used for EVM blockchains only
+    var supportedNftTypes: [NftType] {
+        switch self {
+        case .ethereum: return [.eip721, .eip1155]
+//        case .binanceSmartChain: return [.eip721]
+//        case .polygon: return [.eip721, .eip1155]
+//        case .avalanche: return [.eip721]
+//        case .arbitrumOne: return [.eip721]
+        default: return []
+        }
+    }
+
+    func supports(accountType: AccountType) -> Bool {
+        switch accountType {
+        case .mnemonic:
+            return true
+        case .hdExtendedKey(let key):
+            let info = key.info
+
+            switch (self, info.coinType, info.purpose) {
+            case (.bitcoin, .bitcoin, .bip44): return true
+            case (.bitcoin, .bitcoin, .bip49): return true
+            case (.bitcoin, .bitcoin, .bip84): return true
+            case (.bitcoinCash, .bitcoin, .bip44): return true
+            case (.litecoin, .bitcoin, .bip44): return true
+            case (.litecoin, .bitcoin, .bip49): return true
+            case (.litecoin, .bitcoin, .bip84): return true
+            case (.litecoin, .litecoin, .bip44): return true
+            case (.litecoin, .litecoin, .bip49): return true
+            case (.dash, .bitcoin, .bip44): return true
+            default: return false
+            }
+        case .evmPrivateKey, .evmAddress:
+            switch self {
+            case .ethereum, .binanceSmartChain, .polygon, .avalanche, .optimism, .arbitrumOne: return true
+            default: return false
+            }
         }
     }
 
@@ -130,21 +306,23 @@ extension MarketKit.CoinType {
 
 extension MarketKit.Coin {
 
-    var isCustom: Bool {
-        uid.starts(with: CustomToken.uidPrefix)
-    }
-
     var imageUrl: String {
         let scale = Int(UIScreen.main.scale)
-        return "https://markets.nyc3.digitaloceanspaces.com/coin-icons/\(uid)@\(scale)x.png"
+        return "https://cdn.blocksdecoded.com/coin-icons/32px/\(uid)@\(scale)x.png"
     }
 
 }
 
 extension MarketKit.FullCoin {
 
-    var supportedPlatforms: [Platform] {
-        platforms.filter { $0.coinType.isSupported }
+    var supportedTokens: [Token] {
+        tokens.filter { $0.isSupported }
+    }
+
+    func eligibleTokens(accountType: AccountType) -> [Token] {
+        supportedTokens.filter { token in
+            token.blockchainType.supports(accountType: accountType)
+        }
     }
 
 }
@@ -153,7 +331,7 @@ extension MarketKit.CoinCategory {
 
     var imageUrl: String {
         let scale = Int(UIScreen.main.scale)
-        return "https://markets.nyc3.digitaloceanspaces.com/category-icons/\(uid)@\(scale)x.png"
+        return "https://cdn.blocksdecoded.com/category-icons/\(uid)@\(scale)x.png"
     }
 
 }
@@ -162,7 +340,7 @@ extension MarketKit.CoinInvestment.Fund {
 
     var logoUrl: String {
         let scale = Int(UIScreen.main.scale)
-        return "https://markets.nyc3.digitaloceanspaces.com/fund-icons/\(uid)@\(scale)x.png"
+        return "https://cdn.blocksdecoded.com/fund-icons/\(uid)@\(scale)x.png"
     }
 
 }
@@ -171,7 +349,7 @@ extension MarketKit.CoinTreasury {
 
     var fundLogoUrl: String {
         let scale = Int(UIScreen.main.scale)
-        return "https://markets.nyc3.digitaloceanspaces.com/treasury-icons/\(fundUid)@\(scale)x.png"
+        return "https://cdn.blocksdecoded.com/treasury-icons/\(fundUid)@\(scale)x.png"
     }
 
 }
@@ -180,7 +358,7 @@ extension MarketKit.Auditor {
 
     var logoUrl: String? {
         let scale = Int(UIScreen.main.scale)
-        return "https://markets.nyc3.digitaloceanspaces.com/auditor-icons/\(name)@\(scale)x.png".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        return "https://cdn.blocksdecoded.com/auditor-icons/\(name)@\(scale)x.png".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
     }
 
 }
@@ -234,18 +412,19 @@ extension Array where Element == FullCoin {
 
 }
 
-extension Array where Element == CoinType {
+extension Array where Element == Token {
 
-    var sorted: [CoinType] {
-        sorted { $0.order < $1.order }
-    }
+    var sorted: [Token] {
+        sorted {
+            let lhsTypeOrder = $0.type.order
+            let rhsTypeOrder = $1.type.order
 
-}
+            guard lhsTypeOrder == rhsTypeOrder else {
+                return lhsTypeOrder < rhsTypeOrder
+            }
 
-extension Array where Element == Platform {
-
-    var sorted: [Platform] {
-        sorted { $0.coinType.order < $1.coinType.order }
+            return $0.blockchainType.order < $1.blockchainType.order
+        }
     }
 
 }

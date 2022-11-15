@@ -10,39 +10,22 @@ import ComponentKit
 
 class WalletConnectMainViewController: ThemeViewController {
     private let viewModel: WalletConnectMainViewModel
+    private let disposeBag = DisposeBag()
+
     private weak var sourceViewController: UIViewController?
+
     var requestView: IWalletConnectMainRequestView?
 
     private let spinner = HUDActivityView.create(with: .large48)
-
     private let buttonsHolder = BottomGradientHolder()
-
-    private let disconnectButton = ThemeButton()
-    private var disconnectButtonBottomConstraint: Constraint?
-    private var disconnectButtonHeightConstraint: Constraint?
-
-    private let connectButton = ThemeButton()
-    private var connectButtonBottomConstraint: Constraint?
-    private var connectButtonHeightConstraint: Constraint?
-
-    private let reconnectButton = ThemeButton()
-    private var reconnectButtonBottomConstraint: Constraint?
-    private var reconnectButtonHeightConstraint: Constraint?
-
-    private let cancelButton = ThemeButton()
-    private var cancelButtonBottomConstraint: Constraint?
-    private var cancelButtonHeightConstraint: Constraint?
+    private let disconnectButton = PrimaryButton()
+    private let connectButton = PrimaryButton()
+    private let reconnectButton = PrimaryButton()
+    private let cancelButton = PrimaryButton()
 
     private let tableView = SectionsTableView(style: .grouped)
 
-    private let disposeBag = DisposeBag()
-
-    private var activeAccountName: String?
-    private var appMeta: WalletConnectMainViewModel.AppMetaViewItem?
-    private var blockchainEditable: Bool = false
-    private var blockchains: [WalletConnectMainViewModel.BlockchainViewItem]?
-    private var status: WalletConnectMainViewModel.Status?
-    private var hint: String?
+    private var viewItem: WalletConnectMainViewModel.ViewItem?
 
     init(viewModel: WalletConnectMainViewModel, sourceViewController: UIViewController?) {
         self.viewModel = viewModel
@@ -70,8 +53,7 @@ class WalletConnectMainViewController: ThemeViewController {
         tableView.separatorStyle = .none
         tableView.backgroundColor = .clear
 
-        tableView.registerCell(forClass: TermsHeaderCell.self)
-        tableView.registerCell(forClass: HighlightedDescriptionCell.self)
+        tableView.registerCell(forClass: LogoHeaderCell.self)
 
         view.addSubview(spinner)
         spinner.snp.makeConstraints { maker in
@@ -86,113 +68,88 @@ class WalletConnectMainViewController: ThemeViewController {
             maker.leading.trailing.bottom.equalToSuperview()
         }
 
-        buttonsHolder.addSubview(disconnectButton)
-        disconnectButton.snp.makeConstraints { maker in
-            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin6x)
+        let stackView = UIStackView()
 
-            disconnectButtonBottomConstraint = maker.bottom.equalToSuperview().offset(-CGFloat.margin4x).constraint
-            disconnectButtonHeightConstraint = maker.height.equalTo(CGFloat.heightButton).constraint
+        buttonsHolder.addSubview(stackView)
+        stackView.snp.makeConstraints { maker in
+            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin24)
+            maker.top.equalToSuperview().inset(CGFloat.margin32)
+            maker.bottom.equalToSuperview().offset(-CGFloat.margin16)
         }
 
-        disconnectButton.apply(style: .primaryRed)
-        disconnectButton.setTitle("wallet_connect.button_disconnect".localized, for: .normal)
-        disconnectButton.addTarget(self, action: #selector(onTapDisconnect), for: .touchUpInside)
+        stackView.axis = .vertical
+        stackView.distribution = .fill
+        stackView.alignment = .fill
+        stackView.spacing = .margin16
 
-        buttonsHolder.addSubview(cancelButton)
-        cancelButton.snp.makeConstraints { maker in
-            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin6x)
+        stackView.addArrangedSubview(connectButton)
 
-            cancelButtonBottomConstraint = maker.bottom.equalTo(disconnectButton.snp.top).offset(-CGFloat.margin4x).constraint
-            cancelButtonHeightConstraint = maker.height.equalTo(CGFloat.heightButton).constraint
-        }
+        connectButton.set(style: .yellow)
+        connectButton.setTitle("button.connect".localized, for: .normal)
+        connectButton.addTarget(self, action: #selector(onTapConnect), for: .touchUpInside)
 
-        cancelButton.apply(style: .primaryGray)
-        cancelButton.setTitle("button.cancel".localized, for: .normal)
-        cancelButton.addTarget(self, action: #selector(onTapCancel), for: .touchUpInside)
+        stackView.addArrangedSubview(reconnectButton)
 
-        buttonsHolder.addSubview(reconnectButton)
-        reconnectButton.snp.makeConstraints { maker in
-            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin6x)
-
-            reconnectButtonBottomConstraint = maker.bottom.equalTo(cancelButton.snp.top).offset(-CGFloat.margin4x).constraint
-            reconnectButtonHeightConstraint = maker.height.equalTo(CGFloat.heightButton).constraint
-        }
-
-        reconnectButton.apply(style: .primaryYellow)
+        reconnectButton.set(style: .yellow)
         reconnectButton.setTitle("wallet_connect.button_reconnect".localized, for: .normal)
         reconnectButton.addTarget(self, action: #selector(onTapReconnect), for: .touchUpInside)
 
-        buttonsHolder.addSubview(connectButton)
-        connectButton.snp.makeConstraints { maker in
-            maker.top.equalToSuperview().inset(CGFloat.margin8x)
-            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin6x)
+        stackView.addArrangedSubview(cancelButton)
 
-            connectButtonBottomConstraint = maker.bottom.equalTo(reconnectButton.snp.top).offset(-CGFloat.margin4x).constraint
-            connectButtonHeightConstraint = maker.height.equalTo(CGFloat.heightButton).constraint
-        }
+        cancelButton.set(style: .gray)
+        cancelButton.setTitle("button.cancel".localized, for: .normal)
+        cancelButton.addTarget(self, action: #selector(onTapCancel), for: .touchUpInside)
 
-        connectButton.apply(style: .primaryYellow)
-        connectButton.setTitle("button.connect".localized, for: .normal)
-        connectButton.addTarget(self, action: #selector(onTapConnect), for: .touchUpInside)
+        stackView.addArrangedSubview(disconnectButton)
+
+        disconnectButton.set(style: .red)
+        disconnectButton.setTitle("wallet_connect.button_disconnect".localized, for: .normal)
+        disconnectButton.addTarget(self, action: #selector(onTapDisconnect), for: .touchUpInside)
 
         subscribe(disposeBag, viewModel.showErrorSignal) { [weak self] in
             self?.show(error: $0)
         }
         subscribe(disposeBag, viewModel.showSuccessSignal) {
-            HudHelper.instance.showSuccess(title: "alert.success_action".localized)
+            HudHelper.instance.show(banner: .done)
+        }
+        subscribe(disposeBag, viewModel.showDisconnectSignal) {
+            HudHelper.instance.show(banner: .disconnectedWalletConnect)
         }
         subscribe(disposeBag, viewModel.connectingDriver) { [weak self] in
             self?.sync(connecting: $0)
         }
         subscribe(disposeBag, viewModel.cancelVisibleDriver) { [weak self] in
-            self?.syncButtonConstraints(bottom: self?.cancelButtonBottomConstraint, height: self?.cancelButtonHeightConstraint, visible: $0)
+            self?.cancelButton.isHidden = !$0
         }
         subscribe(disposeBag, viewModel.connectButtonDriver) { [weak self] state in
-            self?.syncButtonConstraints(bottom: self?.connectButtonBottomConstraint, height: self?.connectButtonHeightConstraint, visible: state != .hidden)
+            self?.connectButton.isHidden = state == .hidden
             self?.connectButton.isEnabled = state == .enabled
         }
         subscribe(disposeBag, viewModel.reconnectButtonDriver) { [weak self] state in
-            self?.syncButtonConstraints(bottom: self?.reconnectButtonBottomConstraint, height: self?.reconnectButtonHeightConstraint, visible: state != .hidden)
+            self?.reconnectButton.isHidden = state == .hidden
             self?.reconnectButton.isEnabled = state == .enabled
         }
         subscribe(disposeBag, viewModel.disconnectButtonDriver) { [weak self] state in
             self?.isModalInPresentation = state != .enabled
-            self?.syncButtonConstraints(bottom: self?.disconnectButtonBottomConstraint, height: self?.disconnectButtonHeightConstraint, visible: state != .hidden)
+            self?.disconnectButton.isHidden = state == .hidden
             self?.disconnectButton.isEnabled = state == .enabled
         }
         subscribe(disposeBag, viewModel.closeVisibleDriver) { [weak self] in
             self?.syncCloseButton(visible: $0)
         }
-        subscribe(disposeBag, viewModel.activeAccountNameDriver) { [weak self] in
-            self?.activeAccountName = $0
-        }
-        subscribe(disposeBag, viewModel.appMetaDriver) { [weak self] in
-            self?.appMeta = $0
-        }
-        subscribe(disposeBag, viewModel.blockchainsEditableDriver) { [weak self] in
-            self?.blockchainEditable = $0
-        }
-        subscribe(disposeBag, viewModel.blockchainViewItemDriver) { [weak self] in
-            self?.blockchains = $0
-        }
-        subscribe(disposeBag, viewModel.hintDriver) { [weak self] in
-            self?.hint = $0
-        }
-        subscribe(disposeBag, viewModel.statusDriver) { [weak self] in
-            self?.status = $0
-        }
-        subscribe(disposeBag, viewModel.reloadTableSignal) { [weak self] in
-            self?.tableView.reload(animated: true)
+        subscribe(disposeBag, viewModel.viewItemDriver) { [weak self] in
+            self?.viewItem = $0
+            self?.tableView.reload()
         }
         subscribe(disposeBag, viewModel.finishSignal) { [weak self] in
             self?.close()
         }
 
-        tableView.reload()
+        tableView.buildSections()
     }
 
     private func show(error: String) {
-        HudHelper.instance.showError(title: error)
+        HudHelper.instance.show(banner: .error(string: error))
     }
 
     private func sync(connecting: Bool) {
@@ -202,11 +159,6 @@ class WalletConnectMainViewController: ThemeViewController {
         } else {
             spinner.stopAnimating()
         }
-    }
-
-    private func syncButtonConstraints(bottom: Constraint?, height: Constraint?, visible: Bool) {
-        bottom?.update(offset: visible ? -CGFloat.margin4x : 0)
-        height?.update(offset: visible ? CGFloat.heightButton : 0)
     }
 
     @objc private func onTapCancel() {
@@ -245,140 +197,191 @@ class WalletConnectMainViewController: ThemeViewController {
         sourceViewController?.dismiss(animated: true)
     }
 
-    private var footer: RowProtocol? {
-        hint.map { hint -> RowProtocol in
-            Row<HighlightedDescriptionCell>(
-                    id: "hint_footer",
-                    hash: hint,
-                    dynamicHeight: { width in
-                        HighlightedDescriptionCell.height(containerWidth: width, text: hint)
-                    },
-                    bind: { cell, _ in
-                        cell.descriptionText = hint
-                    }
+    private func openSelectNetwork() {
+        let titleViewItem = BottomSheetItem.ComplexTitleViewItem(
+                title: "wallet_connect.network".localized,
+                image: UIImage(named: "blocks_24")?.withTintColor(.themeJacob)
+        )
+
+        let viewItems = viewModel.blockchainSelectorViewItems
+
+        let items = viewItems.map {
+            ItemSelectorModule.Item.simple(
+                    viewItem: BottomSheetItem.SimpleViewItem(
+                            imageUrl: $0.imageUrl,
+                            title: $0.title,
+                            selected: $0.selected
+                    )
             )
         }
-    }
 
-    private func headerRow(imageUrl: String?, title: String) -> RowProtocol {
-        Row<TermsHeaderCell>(
-                id: "header",
-                hash: "\(title)-\(imageUrl ?? "N/A")",
-                height: TermsHeaderCell.height,
-                bind: { cell, _ in
-                    cell.bind(imageUrl: imageUrl, title: title, subtitle: nil)
-                }
-        )
-    }
+        let itemSelector = ItemSelectorModule.viewController(title: .complex(viewItem: titleViewItem), items: items, onTap: { [weak self] selector, index in
+            selector.dismiss(animated: true)
+            self?.viewModel.onSelect(chainId: viewItems[index].chainId)
+        })
 
-    private func valueRow(title: String, value: String, isFirst: Bool, isLast: Bool, valueColor: UIColor? = nil) -> RowProtocol {
-        CellBuilder.row(
-                elements: [.text, .text],
-                tableView: tableView,
-                id: "non-selectable-row-\(title)",
-                hash: "non-selectable-\(title)-\(value)-\(isFirst.description)-\(isLast.description)",
-                height: .heightCell48,
-                bind: { cell in
-                    cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
-                    cell.bind(index: 0, block: { (component: TextComponent) in
-                        component.set(style: .d1)
-                        component.text = title
-                    })
-                    cell.bind(index: 1, block: { (component: TextComponent) in
-                        component.set(style: .c2)
-                        component.text = value
-                        if let color = valueColor {
-                            component.textColor = color
-                        }
-                    })
-                })
-    }
-
-    private func selectableValueRow(title: String, value: String, selected: Bool, isFirst: Bool, isLast: Bool, valueColor: UIColor? = nil, action: @escaping () -> ()) -> RowProtocol {
-        CellBuilder.selectableRow(
-                elements: [.image24, .text, .text],
-                tableView: tableView,
-                id: "selectable-row-\(title)",
-                hash: "selectable-\(title)-\(value)-\(selected.description)-\(isFirst.description)-\(isLast.description)",
-                height: .heightCell48,
-                autoDeselect: true,
-                bind: { cell in
-                    cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
-
-                    cell.bind(index: 0, block: { (component: ImageComponent) in
-                        component.imageView.image = selected ? UIImage(named: "checkbox_active_24") : UIImage(named: "checkbox_diactive_24")
-                    })
-                    cell.bind(index: 1, block: { (component: TextComponent) in
-                        component.set(style: .d1)
-                        component.text = title
-                    })
-                    cell.bind(index: 2, block: { (component: TextComponent) in
-                        component.set(style: .c2)
-                        component.text = value
-                        if let color = valueColor {
-                            component.textColor = color
-                        }
-                    })
-                },
-                action: action)
+        DispatchQueue.main.async {
+            self.present(itemSelector.toBottomSheet, animated: true)
+        }
     }
 
 }
 
 extension WalletConnectMainViewController: SectionsDataSource {
 
-    public func buildSections() -> [SectionProtocol] {
+    private func headerRow(imageUrl: String?, title: String) -> RowProtocol {
+        Row<LogoHeaderCell>(
+                id: "header",
+                hash: "\(title)-\(imageUrl ?? "N/A")",
+                height: LogoHeaderCell.height,
+                bind: { cell, _ in
+                    cell.title = title
+                    cell.set(imageUrl: imageUrl)
+                }
+        )
+    }
+
+    func buildSections() -> [SectionProtocol] {
         var rows = [RowProtocol]()
 
-        guard let appMeta = appMeta else {
-            return [Section(id: "wallet_connect", rows: rows)]
+        if let viewItem = viewItem {
+            if let dAppMeta = viewItem.dAppMeta {
+                rows.append(headerRow(imageUrl: dAppMeta.icon, title: dAppMeta.name))
+            }
+
+            var rowInfos = [RowInfo]()
+
+            if let status = viewItem.status {
+                rowInfos.append(.value(title: "status".localized, value: status.title, valueColor: status.color))
+            }
+
+            if let dAppMeta = viewItem.dAppMeta {
+                rowInfos.append(.value(title: "wallet_connect.url".localized, value: dAppMeta.url, valueColor: nil))
+            }
+
+            if let accountName = viewItem.activeAccountName {
+                rowInfos.append(.value(title: "wallet_connect.active_account".localized, value: accountName, valueColor: nil))
+            }
+
+            if let address = viewItem.address {
+                rowInfos.append(.value(title: "wallet_connect.address".localized, value: address, valueColor: nil))
+            }
+
+            if let network = viewItem.network {
+                rowInfos.append(.network(value: network, editable: viewItem.networkEditable))
+            }
+
+            if let blockchains = viewItem.blockchains {
+                for blockchain in blockchains {
+                    rowInfos.append(.chain(
+                            title: blockchain.chainTitle ?? "Unsupported",
+                            value: blockchain.address,
+                            selected: blockchain.selected,
+                            chainId: blockchain.chainId
+                    ))
+                }
+            }
+
+            for (index, rowInfo) in rowInfos.enumerated() {
+                let isFirst = index == 0
+                let isLast = index == rowInfos.count - 1
+
+                switch rowInfo {
+                case let .value(title, value, valueColor):
+                    rows.append(tableView.grayTitleWithValueRow(
+                            id: "value-\(index)",
+                            hash: value,
+                            title: title,
+                            value: value,
+                            valueColor: valueColor ?? .themeLeah,
+                            isFirst: isFirst,
+                            isLast: isLast
+                    ))
+                case let .network(value, editable):
+                    let row = CellBuilderNew.row(
+                            rootElement: .hStack([
+                                .text { component in
+                                    component.font = .subhead2
+                                    component.textColor = .themeGray
+                                    component.text = "wallet_connect.network".localized
+                                },
+                                .text { component in
+                                    component.font = .subhead1
+                                    component.textColor = .themeLeah
+                                    component.text = value
+                                },
+                                .margin8,
+                                .image20 { component in
+                                    component.isHidden = !editable
+                                    component.imageView.image = UIImage(named: "arrow_small_down_20")?.withTintColor(.themeGray)
+                                }
+                            ]),
+                            tableView: tableView,
+                            id: "network-\(index)",
+                            hash: value,
+                            height: .heightCell48,
+                            autoDeselect: true,
+                            bind: { cell in
+                                cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
+                            },
+                            action: editable ? { [weak self] in
+                                self?.openSelectNetwork()
+                            } : nil
+                    )
+
+                    rows.append(row)
+                case let .chain(title, value, selected, chainId):
+                    let row = CellBuilderNew.row(
+                            rootElement: .hStack([
+                                .image24 { component in
+                                    component.imageView.image = selected ? UIImage(named: "checkbox_active_24") : UIImage(named: "checkbox_diactive_24")
+                                },
+                                .text { component in
+                                    component.font = .subhead2
+                                    component.textColor = .themeGray
+                                    component.text = title
+                                },
+                                .text { component in
+                                    component.font = .subhead1
+                                    component.textColor = .themeLeah
+                                    component.text = value
+                                }
+                            ]),
+                            tableView: tableView,
+                            id: "chain-\(index)",
+                            hash: "\(selected)",
+                            height: .heightCell48,
+                            autoDeselect: true,
+                            bind: { cell in
+                                cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
+                            },
+                            action: { [weak self] in
+                                self?.viewModel.onToggle(chainId: chainId)
+                            }
+                    )
+
+                    rows.append(row)
+                }
+            }
+
+            if let hint = viewItem.hint {
+                rows.append(tableView.highlightedDescriptionRow(id: "hint_footer", text: hint))
+            }
         }
 
-        if let imageUrl = appMeta.icon {
-            rows.append(headerRow(imageUrl: imageUrl, title: appMeta.name))
-        }
+        return [
+            Section(id: "wallet_connect", rows: rows)
+        ]
+    }
 
-        if let status = status {
-            rows.append(valueRow(title: "status".localized, value: status.title, isFirst: true, isLast: activeAccountName == nil, valueColor: status.color))
-        }
+}
 
-        rows.append(valueRow(title: "wallet_connect.url".localized, value: appMeta.url, isFirst: status == nil, isLast: activeAccountName == nil))
+extension WalletConnectMainViewController {
 
-        if let accountName = activeAccountName {
-            rows.append(valueRow(title: "wallet_connect.active_account".localized, value: accountName, isFirst: status == nil, isLast: (blockchains ?? []).isEmpty))
-        }
-
-        if let blockchains = blockchains, !blockchains.isEmpty {
-            rows.append(contentsOf: blockchains
-                    .enumerated()
-                    .map { index, blockchain in
-                        if blockchainEditable {
-                            return selectableValueRow(
-                                    title: blockchain.chainTitle ?? "Unsupported",
-                                    value: blockchain.address,
-                                    selected: blockchain.selected,
-                                    isFirst: false,
-                                    isLast: index == blockchains.count - 1,
-                                    action: { [weak self] in
-                                        self?.viewModel.onToggle(chainId: blockchain.chainId)
-                                    }
-                            )
-                        } else {
-                            return valueRow(
-                                    title: blockchain.chainTitle ?? "Unsupported",
-                                    value: blockchain.address,
-                                    isFirst: false,
-                                    isLast: index == blockchains.count - 1
-                            )
-                        }
-                    })
-        }
-
-        if let footerRow = footer {
-            rows.append(footerRow)
-        }
-
-        return [Section(id: "wallet_connect", rows: rows)]
+    enum RowInfo {
+        case value(title: String, value: String, valueColor: UIColor?)
+        case network(value: String, editable: Bool)
+        case chain(title: String, value: String, selected: Bool, chainId: Int)
     }
 
 }

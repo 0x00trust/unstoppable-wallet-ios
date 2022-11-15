@@ -11,7 +11,7 @@ class CoinMarketsViewModel {
     private let viewItemsRelay = BehaviorRelay<[ViewItem]?>(value: nil)
     private let loadingRelay = BehaviorRelay<Bool>(value: false)
     private let infoRelay = BehaviorRelay<String?>(value: nil)
-    private let errorRelay = BehaviorRelay<String?>(value: nil)
+    private let syncErrorRelay = BehaviorRelay<Bool>(value: false)
     private let scrollToTopRelay = PublishRelay<()>()
 
     private var volumeType: VolumeType = .coin {
@@ -34,12 +34,12 @@ class CoinMarketsViewModel {
             viewItemsRelay.accept(nil)
             loadingRelay.accept(true)
             infoRelay.accept(nil)
-            errorRelay.accept(nil)
+            syncErrorRelay.accept(false)
         case .loaded(let tickers, let reorder):
             viewItemsRelay.accept(viewItems(tickers: tickers))
             loadingRelay.accept(false)
             infoRelay.accept(tickers.isEmpty ? "coin_page.markets.empty".localized : nil)
-            errorRelay.accept(nil)
+            syncErrorRelay.accept(false)
 
             if reorder {
                 scrollToTopRelay.accept(())
@@ -48,7 +48,7 @@ class CoinMarketsViewModel {
             viewItemsRelay.accept(nil)
             loadingRelay.accept(false)
             infoRelay.accept(nil)
-            errorRelay.accept("market.sync_error".localized)
+            syncErrorRelay.accept(true)
         }
     }
 
@@ -70,20 +70,21 @@ class CoinMarketsViewModel {
                 market: ticker.marketName,
                 marketImageUrl: ticker.marketImageUrl,
                 pair: "\(service.coinCode) / \(ticker.target)",
-                rate: ValueFormatter.instance.format(value: ticker.rate, decimalCount: 8, symbol: ticker.target, fractionPolicy: .threshold(high: 0.01, low: 0)),
-                volume: volume(value: ticker.volume, price: price)
+                rate: ValueFormatter.instance.formatShort(value: ticker.rate, decimalCount: 8, symbol: ticker.target),
+                volume: volume(value: ticker.volume, price: price),
+                tradeUrl: ticker.tradeUrl
         )
     }
 
     private func volume(value: Decimal, price: Decimal?) -> String? {
         switch volumeType {
         case .coin:
-            return CurrencyCompactFormatter.instance.format(symbol: service.coinCode, value: value)
+            return ValueFormatter.instance.formatShort(value: value, decimalCount: 8, symbol: service.coinCode)
         case .currency:
             guard let price = price else {
                 return "n/a".localized
             }
-            return CurrencyCompactFormatter.instance.format(currency: service.currency, value: value * price)
+            return ValueFormatter.instance.formatShort(currency: service.currency, value: value * price)
         }
     }
 
@@ -130,15 +131,15 @@ extension CoinMarketsViewModel {
         infoRelay.asDriver()
     }
 
-    var errorDriver: Driver<String?> {
-        errorRelay.asDriver()
+    var syncErrorDriver: Driver<Bool> {
+        syncErrorRelay.asDriver()
     }
 
     func onLoad() {
         service.sync()
     }
 
-    func onRefresh() {
+    func onTapRetry() {
         service.sync()
     }
 
@@ -157,6 +158,7 @@ extension CoinMarketsViewModel {
         let pair: String
         let rate: String?
         let volume: String?
+        let tradeUrl: String?
     }
 
 }

@@ -1,9 +1,30 @@
+import Foundation
 import RxSwift
 import RxRelay
 import CurrencyKit
 import MarketKit
 
 class MarketAdvancedSearchService {
+    private let blockchainTypes: [BlockchainType] = [
+        .ethereum,
+        .binanceSmartChain,
+        .binanceChain,
+        .arbitrumOne,
+        .avalanche,
+        .unsupported(uid: "fantom"),
+        .unsupported(uid: "harmony"),
+        .unsupported(uid: "huobi-token"),
+        .unsupported(uid: "iotex"),
+        .unsupported(uid: "moonriver"),
+        .unsupported(uid: "okex-chain"),
+        .optimism,
+        .polygon,
+        .unsupported(uid: "solana"),
+        .unsupported(uid: "sora"),
+        .unsupported(uid: "tomochain"),
+        .unsupported(uid: "xdai"),
+    ]
+
     private var disposeBag = DisposeBag()
     private let allTimeDeltaPercent: Decimal = 10
 
@@ -59,8 +80,8 @@ class MarketAdvancedSearchService {
         }
     }
 
-    private var blockchainsRelay = PublishRelay<[MarketAdvancedSearchModule.Blockchain]>()
-    var blockchains: [MarketAdvancedSearchModule.Blockchain] = [] {
+    private var blockchainsRelay = PublishRelay<[Blockchain]>()
+    var blockchains: [Blockchain] = [] {
         didSet {
             guard blockchains != oldValue else {
                 return
@@ -159,9 +180,18 @@ class MarketAdvancedSearchService {
         currencyKit.baseCurrency.code
     }
 
+    let allBlockchains: [Blockchain]
+
     init(marketKit: MarketKit.Kit, currencyKit: CurrencyKit.Kit) {
         self.marketKit = marketKit
         self.currencyKit = currencyKit
+
+        do {
+            let blockchains = try marketKit.blockchains(uids: blockchainTypes.map { $0.uid })
+            allBlockchains = blockchainTypes.compactMap { type in blockchains.first(where: { $0.type == type }) }
+        } catch {
+            allBlockchains = []
+        }
 
         syncMarketInfos()
     }
@@ -226,40 +256,18 @@ class MarketAdvancedSearchService {
         return abs(value) < allTimeDeltaPercent
     }
 
-    private func inBlockchain(coinTypes: [CoinType]?) -> Bool {
+    private func inBlockchain(tokens: [Token]?) -> Bool {
         guard !blockchains.isEmpty else {
             return true
         }
 
-        guard let coinTypes = coinTypes else {
+        guard let tokens = tokens else {
             return false
         }
 
-        for coinType in coinTypes {
-            for blockchain in blockchains {
-                switch (blockchain, coinType) {
-                case (.ethereum, .ethereum),
-                     (.ethereum, .erc20),
-                     (.binanceSmartChain, .binanceSmartChain),
-                     (.binanceSmartChain, .bep20),
-                     (.polygon, .polygon),
-                     (.polygon, .mrc20),
-                     (.binance, .bep2),
-                     (.arbitrum, .arbitrumOne),
-                     (.avalanche, .avalanche),
-                     (.fantom, .fantom),
-                     (.harmony, .harmonyShard0),
-                     (.huobi, .huobiToken),
-                     (.iotex, .iotex),
-                     (.moonriver, .moonriver),
-                     (.okex, .okexChain),
-                     (.solana, .solana),
-                     (.sora, .sora),
-                     (.tomochain, .tomochain),
-                     (.xdai, .xdai):
-                    return true
-                default: ()
-                }
+        for token in tokens {
+            if blockchains.contains(token.blockchain) {
+                return true
             }
         }
 
@@ -272,7 +280,7 @@ class MarketAdvancedSearchService {
 
             return inBounds(value: marketInfo.marketCap, lower: marketCap.lowerBound, upper: marketCap.upperBound) &&
                     inBounds(value: marketInfo.totalVolume, lower: volume.lowerBound, upper: volume.upperBound) &&
-                    inBlockchain(coinTypes: marketInfo.coinTypes) &&
+                    inBlockchain(tokens: marketInfo.fullCoin.tokens) &&
                     inBounds(value: priceChangeValue, lower: priceChange.lowerBound, upper: priceChange.upperBound) &&
                     (!outperformedBtc || outperformed(value: priceChangeValue, coinUid: "bitcoin")) &&
                     (!outperformedEth || outperformed(value: priceChangeValue, coinUid: "ethereum")) &&
@@ -302,7 +310,7 @@ extension MarketAdvancedSearchService {
         volumeRelay.asObservable()
     }
 
-    var blockchainsObservable: Observable<[MarketAdvancedSearchModule.Blockchain]> {
+    var blockchainsObservable: Observable<[Blockchain]> {
         blockchainsRelay.asObservable()
     }
 

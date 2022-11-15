@@ -13,9 +13,9 @@ class CoinAuditsViewController: ThemeViewController {
     private let disposeBag = DisposeBag()
 
     private let tableView = SectionsTableView(style: .grouped)
-    private let emptyLabel = UILabel()
+    private let emptyView = PlaceholderView()
     private let spinner = HUDActivityView.create(with: .medium24)
-    private let errorView = MarketListErrorView()
+    private let errorView = PlaceholderViewModule.reachabilityView()
 
     private var viewItems: [CoinAuditsViewModel.ViewItem]?
 
@@ -47,17 +47,13 @@ class CoinAuditsViewController: ThemeViewController {
 
         tableView.registerCell(forClass: BrandFooterCell.self)
 
-        view.addSubview(emptyLabel)
-        emptyLabel.snp.makeConstraints { maker in
-            maker.leading.trailing.equalToSuperview().inset(CGFloat.margin48)
-            maker.centerY.equalToSuperview()
+        view.addSubview(emptyView)
+        emptyView.snp.makeConstraints { maker in
+            maker.edges.equalTo(view.safeAreaLayoutGuide)
         }
 
-        emptyLabel.numberOfLines = 0
-        emptyLabel.textAlignment = .center
-        emptyLabel.font = .subhead2
-        emptyLabel.textColor = .themeGray
-        emptyLabel.text = "coin_page.audits.no_reports".localized
+        emptyView.image = UIImage(named: "not_available_48")
+        emptyView.text = "coin_page.audits.no_reports".localized
 
         view.addSubview(spinner)
         spinner.snp.makeConstraints { maker in
@@ -68,23 +64,22 @@ class CoinAuditsViewController: ThemeViewController {
 
         view.addSubview(errorView)
         errorView.snp.makeConstraints { maker in
-            maker.edges.equalToSuperview()
+            maker.edges.equalTo(view.safeAreaLayoutGuide)
         }
 
-        errorView.onTapRetry = { [weak self] in self?.viewModel.refresh() }
+        errorView.configureSyncError(action: { [weak self] in self?.onRetry() })
 
         subscribe(disposeBag, viewModel.viewItemsDriver) { [weak self] in self?.sync(viewItems: $0) }
         subscribe(disposeBag, viewModel.loadingDriver) { [weak self] loading in
             self?.spinner.isHidden = !loading
         }
-        subscribe(disposeBag, viewModel.errorDriver) { [weak self] error in
-            if let error = error {
-                self?.errorView.text = error
-                self?.errorView.isHidden = false
-            } else {
-                self?.errorView.isHidden = true
-            }
+        subscribe(disposeBag, viewModel.syncErrorDriver) { [weak self] visible in
+            self?.errorView.isHidden = !visible
         }
+    }
+
+    @objc private func onRetry() {
+        viewModel.onTapRetry()
     }
 
     private func sync(viewItems: [CoinAuditsViewModel.ViewItem]?) {
@@ -92,10 +87,10 @@ class CoinAuditsViewController: ThemeViewController {
 
         if let viewItems = viewItems {
             tableView.bounces = true
-            emptyLabel.isHidden = !viewItems.isEmpty
+            emptyView.isHidden = !viewItems.isEmpty
         } else {
             tableView.bounces = false
-            emptyLabel.isHidden = true
+            emptyView.isHidden = true
         }
 
         tableView.reload()
@@ -123,7 +118,8 @@ extension CoinAuditsViewController: SectionsDataSource {
                     })
 
                     cell.bind(index: 1, block: { (component: TextComponent) in
-                        component.set(style: .b2)
+                        component.font = .body
+                        component.textColor = .themeLeah
                         component.text = name
                     })
                 }
@@ -136,8 +132,10 @@ extension CoinAuditsViewController: SectionsDataSource {
 
             cell.bind(index: 0, block: { (component: MultiTextComponent) in
                 component.set(style: .m1)
-                component.title.set(style: .b2)
-                component.subtitle.set(style: .d1)
+                component.title.font = .body
+                component.title.textColor = .themeLeah
+                component.subtitle.font = .subhead2
+                component.subtitle.textColor = .themeGray
 
                 component.title.text = auditViewItem.date
                 component.subtitle.text = auditViewItem.name
@@ -145,7 +143,8 @@ extension CoinAuditsViewController: SectionsDataSource {
 
             cell.bind(index: 1, block: { (component: TextComponent) in
                 component.setContentHuggingPriority(.required, for: .horizontal)
-                component.set(style: .c1)
+                component.font = .subhead1
+                component.textColor = .themeGray
                 component.text = auditViewItem.issues
             })
         }

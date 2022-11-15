@@ -1,8 +1,10 @@
+import Foundation
 import BitcoinCore
 import Hodler
 import RxSwift
 import HsToolKit
 import MarketKit
+import HdWalletKit
 
 class BitcoinBaseAdapter {
     static let confirmationsThreshold = 3
@@ -19,22 +21,21 @@ class BitcoinBaseAdapter {
     private(set) var balanceState: AdapterState {
         didSet {
             balanceStateSubject.onNext(balanceState)
-            transactionState = balanceState
+            syncing = balanceState.syncing
         }
     }
-    private(set) var transactionState: AdapterState
+    private(set) var syncing: Bool = true
 
-    private let coin: PlatformCoin
+    private let token: Token
     private let transactionSource: TransactionSource
 
     init(abstractKit: AbstractKit, wallet: Wallet, testMode: Bool) {
         self.abstractKit = abstractKit
         self.testMode = testMode
-        coin = wallet.platformCoin
+        token = wallet.token
         transactionSource = wallet.transactionSource
 
         balanceState = .notSynced(error: AppError.unknownError)
-        transactionState = balanceState
     }
 
     func transactionRecord(fromTransaction transaction: TransactionInfo) -> BitcoinTransactionRecord {
@@ -70,7 +71,7 @@ class BitcoinBaseAdapter {
         switch transaction.type {
         case .incoming:
             return BitcoinIncomingTransactionRecord(
-                    coin: coin,
+                    token: token,
                     source: transactionSource,
                     uid: transaction.uid,
                     transactionHash: transaction.transactionHash,
@@ -88,7 +89,7 @@ class BitcoinBaseAdapter {
             )
         case .outgoing:
             return BitcoinOutgoingTransactionRecord(
-                    coin: coin,
+                    token: token,
                     source: transactionSource,
                     uid: transaction.uid,
                     transactionHash: transaction.transactionHash,
@@ -107,7 +108,7 @@ class BitcoinBaseAdapter {
             )
         case .sentToSelf:
             return BitcoinOutgoingTransactionRecord(
-                    coin: coin,
+                    token: token,
                     source: transactionSource,
                     uid: transaction.uid,
                     transactionHash: transaction.transactionHash,
@@ -137,22 +138,6 @@ class BitcoinBaseAdapter {
         switch sort {
         case .shuffle: return .shuffle
         case .bip69: return .bip69
-        }
-    }
-
-    class func kitMode(from syncMode: SyncMode) -> BitcoinCore.SyncMode {
-        switch syncMode {
-        case .fast: return .api
-        case .slow: return .full
-        case .new: return .newWallet
-        }
-    }
-
-    class func bip(from derivation: MnemonicDerivation) -> Bip {
-        switch derivation {
-        case .bip44: return Bip.bip44
-        case .bip49: return Bip.bip49
-        case .bip84: return Bip.bip84
         }
     }
 
@@ -256,11 +241,12 @@ extension BitcoinBaseAdapter: BitcoinCoreDelegate {
 
             balanceState = .syncing(progress: newProgress, lastBlockDate: newDate)
         case .apiSyncing(let newCount):
-            if case .searchingTxs(let count) = balanceState, newCount == count {
+            let newCountDescription = "balance.searching.count".localized("\(newCount)")
+            if case .customSyncing(_, let secondary, _) = balanceState, newCountDescription == secondary {
                 return
             }
 
-            balanceState = .searchingTxs(count: newCount)
+            balanceState = .customSyncing(main: "balance.searching".localized(), secondary: newCountDescription, progress: nil)
         }
     }
 
@@ -294,7 +280,11 @@ extension BitcoinBaseAdapter {
     }
 
     func minimumSendAmount(address: String?) -> Decimal {
-        Decimal(abstractKit.minSpendableValue(toAddress: address)) / coinRate
+        do {
+            return Decimal(try abstractKit.minSpendableValue(toAddress: address)) / coinRate
+        } catch {
+            return 0
+        }
     }
 
     func validate(address: String, pluginData: [UInt8: IBitcoinPluginData] = [:]) throws {
@@ -338,7 +328,7 @@ extension BitcoinBaseAdapter: ITransactionsAdapter {
         abstractKit.lastBlockInfo.map { LastBlockInfo(height: $0.height, timestamp: $0.timestamp) }
     }
 
-    var transactionStateUpdatedObservable: Observable<Void> {
+    var syncingObservable: Observable<Void> {
         balanceStateSubject.map { _ in () }
     }
 
@@ -346,7 +336,7 @@ extension BitcoinBaseAdapter: ITransactionsAdapter {
         lastBlockUpdatedSubject.asObservable()
     }
 
-    func transactionsObservable(coin: PlatformCoin?, filter: TransactionTypeFilter) -> Observable<[TransactionRecord]> {
+    func transactionsObservable(token: Token?, filter: TransactionTypeFilter) -> Observable<[TransactionRecord]> {
         transactionRecordsSubject.asObservable()
                 .map { transactions in
                     transactions.compactMap { transaction -> TransactionRecord? in
@@ -362,7 +352,7 @@ extension BitcoinBaseAdapter: ITransactionsAdapter {
                 .filter { !$0.isEmpty }
     }
 
-    func transactionsSingle(from: TransactionRecord?, coin: PlatformCoin?, filter: TransactionTypeFilter, limit: Int) -> Single<[TransactionRecord]> {
+    func transactionsSingle(from: TransactionRecord?, token: Token?, filter: TransactionTypeFilter, limit: Int) -> Single<[TransactionRecord]> {
         let bitcoinFilter: TransactionFilterType?
         switch filter {
         case .all: bitcoinFilter = nil

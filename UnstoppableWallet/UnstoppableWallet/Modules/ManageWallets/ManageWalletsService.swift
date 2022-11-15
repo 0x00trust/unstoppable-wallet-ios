@@ -1,10 +1,11 @@
 import RxSwift
 import RxRelay
 import MarketKit
+import EvmKit
 
 class ManageWalletsService {
     private let account: Account
-    private let coinManager: CoinManager
+    private let marketKit: MarketKit.Kit
     private let walletManager: WalletManager
     private let enableCoinService: EnableCoinService
     private let disposeBag = DisposeBag()
@@ -16,29 +17,30 @@ class ManageWalletsService {
     private let itemsRelay = PublishRelay<[Item]>()
     private let cancelEnableCoinRelay = PublishRelay<Coin>()
 
-    private var addedCoins = [Coin]()
-
     var items: [Item] = [] {
         didSet {
             itemsRelay.accept(items)
         }
     }
 
-    init?(coinManager: CoinManager, walletManager: WalletManager, accountManager: IAccountManager, enableCoinService: EnableCoinService) {
+    init?(marketKit: MarketKit.Kit, walletManager: WalletManager, accountManager: AccountManager, enableCoinService: EnableCoinService) {
         guard let account = accountManager.activeAccount else {
             return nil
         }
 
         self.account = account
-        self.coinManager = coinManager
+        self.marketKit = marketKit
         self.walletManager = walletManager
         self.enableCoinService = enableCoinService
 
         subscribe(disposeBag, walletManager.activeWalletsUpdatedObservable) { [weak self] wallets in
             self?.handleUpdated(wallets: wallets)
         }
-        subscribe(disposeBag, enableCoinService.enableCoinObservable) { [weak self] configuredPlatformsCoins, restoreSettings in
-            self?.handleEnableCoin(configuredPlatformCoins: configuredPlatformsCoins, restoreSettings: restoreSettings)
+        subscribe(disposeBag, enableCoinService.enableCoinObservable) { [weak self] configuredTokens, restoreSettings in
+            self?.handleEnableCoin(configuredTokens: configuredTokens, restoreSettings: restoreSettings)
+        }
+        subscribe(disposeBag, enableCoinService.disableCoinObservable) { [weak self] coin in
+            self?.handleDisable(coin: coin)
         }
         subscribe(disposeBag, enableCoinService.cancelEnableCoinObservable) { [weak self] fullCoin in
             self?.handleCancelEnable(fullCoin: fullCoin)
@@ -53,9 +55,23 @@ class ManageWalletsService {
     private func fetchFullCoins() -> [FullCoin] {
         do {
             if filter.trimmingCharacters(in: .whitespaces).isEmpty {
-                return try coinManager.featuredFullCoins(enabledPlatformCoins: wallets.map { $0.platformCoin })
+                let featuredFullCoins = try marketKit.fullCoins(filter: "", limit: 100).filter { fullCoin in
+                    !fullCoin.eligibleTokens(accountType: account.type).isEmpty
+                }
+
+                let featuredCoins = featuredFullCoins.map { $0.coin }
+                let enabledFullCoins = try marketKit.fullCoins(coinUids: wallets.filter { !featuredCoins.contains($0.coin) }.map { $0.coin.uid })
+
+                let customFullCoins = wallets.map { $0.token }.filter { $0.isCustom }.map { $0.fullCoin }
+
+                return featuredFullCoins + enabledFullCoins + customFullCoins
+            } else if let ethAddress = try? EvmKit.Address(hex: filter) {
+                let address = ethAddress.hex
+                let tokens = try marketKit.tokens(reference: address)
+                let coinUids = Array(Set(tokens.map { $0.coin.uid }))
+                return try marketKit.fullCoins(coinUids: coinUids)
             } else {
-                return try coinManager.fullCoins(filter: filter, limit: 20)
+                return try marketKit.fullCoins(filter: filter, limit: 20)
             }
         } catch {
             return []
@@ -78,26 +94,26 @@ class ManageWalletsService {
         self.wallets = Set(wallets)
     }
 
-    private func hasSettingsOrPlatforms(supportedPlatforms: [Platform]) -> Bool {
-        if supportedPlatforms.count == 1 {
-            let platform = supportedPlatforms[0]
-            return !platform.coinType.coinSettingTypes.isEmpty
+    private func hasSettingsOrTokens(tokens: [Token]) -> Bool {
+        if tokens.count == 1 {
+            let token = tokens[0]
+            return token.blockchainType.coinSettingType != nil || token.type != .native
         } else {
             return true
         }
     }
 
     private func item(fullCoin: FullCoin) -> Item {
-        let supportedPlatforms = fullCoin.supportedPlatforms
-        let fullCoin = FullCoin(coin: fullCoin.coin, platforms: supportedPlatforms)
-
         let itemState: ItemState
 
-        if supportedPlatforms.isEmpty {
+        let eligibleTokens = fullCoin.eligibleTokens(accountType: account.type)
+        let fullCoin = FullCoin(coin: fullCoin.coin, tokens: eligibleTokens)
+
+        if eligibleTokens.isEmpty {
             itemState = .unsupported
         } else {
             let enabled = isEnabled(coin: fullCoin.coin)
-            itemState = .supported(enabled: enabled, hasSettings: enabled && hasSettingsOrPlatforms(supportedPlatforms: supportedPlatforms))
+            itemState = .supported(enabled: enabled, hasSettings: enabled && hasSettingsOrTokens(tokens: eligibleTokens))
         }
 
         return Item(fullCoin: fullCoin, state: itemState)
@@ -120,26 +136,33 @@ class ManageWalletsService {
         syncState()
     }
 
-    private func handleEnableCoin(configuredPlatformCoins: [ConfiguredPlatformCoin], restoreSettings: RestoreSettings) {
-        guard let coin = configuredPlatformCoins.first?.platformCoin.coin else {
+    private func handleEnableCoin(configuredTokens: [ConfiguredToken], restoreSettings: RestoreSettings) {
+        guard let coin = configuredTokens.first?.token.coin else {
             return
         }
 
-        if !restoreSettings.isEmpty && configuredPlatformCoins.count == 1 {
-            enableCoinService.save(restoreSettings: restoreSettings, account: account, coinType: configuredPlatformCoins[0].platformCoin.coinType)
+        if !restoreSettings.isEmpty && configuredTokens.count == 1 {
+            enableCoinService.save(restoreSettings: restoreSettings, account: account, blockchainType: configuredTokens[0].token.blockchainType)
         }
 
         let existingWallets = wallets.filter { $0.coin == coin }
-        let existingConfiguredPlatformCoins = existingWallets.map { $0.configuredPlatformCoin }
+        let existingConfiguredTokens = existingWallets.map { $0.configuredToken }
 
-        let newConfiguredCoins = configuredPlatformCoins.filter { !existingConfiguredPlatformCoins.contains($0) }
-        let removedWallets = existingWallets.filter { !configuredPlatformCoins.contains($0.configuredPlatformCoin) }
+        let newConfiguredTokens = configuredTokens.filter { !existingConfiguredTokens.contains($0) }
+        let removedWallets = existingWallets.filter { !configuredTokens.contains($0.configuredToken) }
 
-        let newWallets = newConfiguredCoins.map { Wallet(configuredPlatformCoin: $0, account: account) }
+        let newWallets = newConfiguredTokens.map { Wallet(configuredToken: $0, account: account) }
 
         if !newWallets.isEmpty || !removedWallets.isEmpty {
             walletManager.handle(newWallets: newWallets, deletedWallets: Array(removedWallets))
         }
+    }
+
+    private func handleDisable(coin: Coin) {
+        let walletsToDelete = wallets.filter { $0.coin == coin }
+        walletManager.delete(wallets: Array(walletsToDelete))
+
+        cancelEnableCoinRelay.accept(coin)
     }
 
     private func handleCancelEnable(fullCoin: FullCoin) {
@@ -160,6 +183,10 @@ extension ManageWalletsService {
         cancelEnableCoinRelay.asObservable()
     }
 
+    var accountType: AccountType {
+        account.type
+    }
+
     func set(filter: String) {
         self.filter = filter
 
@@ -173,7 +200,7 @@ extension ManageWalletsService {
             return
         }
 
-        enableCoinService.enable(fullCoin: fullCoin, account: account)
+        enableCoinService.enable(fullCoin: fullCoin, accountType: account.type, account: account)
     }
 
     func disable(uid: String) {
@@ -187,7 +214,7 @@ extension ManageWalletsService {
         }
 
         let coinWallets = wallets.filter { $0.coin.uid == uid }
-        enableCoinService.configure(fullCoin: fullCoin, configuredPlatformCoins: coinWallets.map { $0.configuredPlatformCoin })
+        enableCoinService.configure(fullCoin: fullCoin, accountType: account.type, configuredTokens: coinWallets.map { $0.configuredToken })
     }
 
 }

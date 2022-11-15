@@ -8,13 +8,13 @@ class MarketListDefiDecorator {
 
     var marketField: MarketModule.MarketField {
         didSet {
-            service.onUpdate(marketField: marketField)
+            service.onUpdate(marketFieldIndex: marketField.rawValue)
         }
     }
 
     init(service: IMarketListDecoratorService) {
         self.service = service
-        marketField = service.initialMarketField
+        marketField = MarketModule.MarketField.allCases[service.initialMarketFieldIndex]
     }
 
 }
@@ -41,31 +41,27 @@ extension MarketListDefiDecorator: IMarketListDecorator {
         let marketInfo = item.marketInfo
         let currency = service.currency
 
-        let price = marketInfo.price.flatMap {
-            ValueFormatter.instance.format(
-                    currencyValue: CurrencyValue(currency: currency, value: $0),
-                    fractionPolicy: .threshold(high: 1000, low: 0.000001),
-                    trimmable: false
-            )
-        } ?? "n/a".localized
+        let price = marketInfo.price.flatMap { ValueFormatter.instance.formatShort(currency: currency, value: $0) } ?? "n/a".localized
 
         let dataValue: MarketModule.MarketDataValue
 
         switch marketField {
         case .price: dataValue = .diff(marketInfo.priceChangeValue(type: service.priceChangeType))
-        case .volume: dataValue = .volume(CurrencyCompactFormatter.instance.format(currency: currency, value: marketInfo.totalVolume) ?? "n/a".localized)
-        case .marketCap: dataValue = .marketCap(CurrencyCompactFormatter.instance.format(currency: currency, value: marketInfo.marketCap) ?? "n/a".localized)
+        case .volume: dataValue = .volume(marketInfo.totalVolume.flatMap { ValueFormatter.instance.formatShort(currency: currency, value: $0) } ?? "n/a".localized)
+        case .marketCap: dataValue = .marketCap(marketInfo.marketCap.flatMap { ValueFormatter.instance.formatShort(currency: currency, value: $0) } ?? "n/a".localized)
         }
 
         return MarketModule.ListViewItem(
                 uid: marketInfo.fullCoin.coin.uid,
                 iconUrl: marketInfo.fullCoin.coin.imageUrl,
+                iconShape: .round,
                 iconPlaceholderName: marketInfo.fullCoin.placeholderImageName,
-                name: marketInfo.fullCoin.coin.name,
-                code: marketInfo.fullCoin.coin.code,
-                rank: "\(item.tvlRank)",
-                price: price,
-                dataValue: dataValue
+                leftPrimaryValue: marketInfo.fullCoin.coin.code,
+                leftSecondaryValue: marketInfo.fullCoin.coin.name,
+                badge: "\(item.tvlRank)",
+                badgeSecondaryValue: nil,
+                rightPrimaryValue: price,
+                rightSecondaryValue: dataValue
         )
     }
 

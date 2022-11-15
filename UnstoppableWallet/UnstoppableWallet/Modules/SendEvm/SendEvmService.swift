@@ -2,11 +2,12 @@ import Foundation
 import MarketKit
 import RxSwift
 import RxRelay
-import EthereumKit
+import EvmKit
 import BigInt
+import HsExtensions
 
 class SendEvmService {
-    let sendPlatformCoin: PlatformCoin
+    let sendToken: Token
     private let disposeBag = DisposeBag()
     private let adapter: ISendEthereumAdapter
     private let addressService: AddressService
@@ -28,15 +29,8 @@ class SendEvmService {
         }
     }
 
-    private let addressErrorRelay = PublishRelay<Error?>()
-    private var addressError: Error? {
-        didSet {
-            addressErrorRelay.accept(addressError)
-        }
-    }
-
-    init(platformCoin: PlatformCoin, adapter: ISendEthereumAdapter, addressService: AddressService) {
-        sendPlatformCoin = platformCoin
+    init(token: Token, adapter: ISendEthereumAdapter, addressService: AddressService) {
+        sendToken = token
         self.adapter = adapter
         self.addressService = addressService
 
@@ -47,7 +41,7 @@ class SendEvmService {
         switch addressState {
         case .success(let address):
             do {
-                addressData = AddressData(evmAddress: try EthereumKit.Address(hex: address.raw), domain: address.domain)
+                addressData = AddressData(evmAddress: try EvmKit.Address(hex: address.raw), domain: address.domain)
             } catch {
                 addressData = nil
             }
@@ -70,7 +64,7 @@ class SendEvmService {
     }
 
     private func validEvmAmount(amount: Decimal) throws -> BigUInt {
-        guard let evmAmount = BigUInt(amount.roundedString(decimal: sendPlatformCoin.decimals)) else {
+        guard let evmAmount = BigUInt(amount.hs.roundedString(decimal: sendToken.decimals)) else {
             throw AmountError.invalidDecimal
         }
 
@@ -97,8 +91,12 @@ extension SendEvmService {
 
 extension SendEvmService: IAvailableBalanceService {
 
-    var availableBalance: Decimal {
-        adapter.balanceData.balance
+    var availableBalance: DataStatus<Decimal> {
+        .completed(adapter.balanceData.balance)
+    }
+
+    var availableBalanceObservable: Observable<DataStatus<Decimal>> {
+        Observable.just(availableBalance)
     }
 
 }
@@ -109,8 +107,8 @@ extension SendEvmService: IAmountInputService {
         0
     }
 
-    var platformCoin: PlatformCoin? {
-        sendPlatformCoin
+    var token: Token? {
+        sendToken
     }
 
     var balance: Decimal? {
@@ -121,8 +119,12 @@ extension SendEvmService: IAmountInputService {
         .empty()
     }
 
-    var platformCoinObservable: Observable<PlatformCoin?> {
+    var tokenObservable: Observable<Token?> {
         .empty()
+    }
+
+    var balanceObservable: Observable<Decimal?> {
+        .just(adapter.balanceData.balance)
     }
 
     func onChange(amount: Decimal) {
@@ -132,8 +134,8 @@ extension SendEvmService: IAmountInputService {
 
                 var amountWarning: AmountWarning? = nil
                 if amount.isEqual(to: adapter.balanceData.balance) {
-                    switch sendPlatformCoin.coinType {
-                    case .binanceSmartChain, .ethereum: amountWarning = AmountWarning.coinNeededForFee
+                    switch sendToken.type {
+                    case .native: amountWarning = AmountWarning.coinNeededForFee
                     default: ()
                     }
                 }
@@ -170,7 +172,7 @@ extension SendEvmService {
     }
 
     private struct AddressData {
-        let evmAddress: EthereumKit.Address
+        let evmAddress: EvmKit.Address
         let domain: String?
     }
 

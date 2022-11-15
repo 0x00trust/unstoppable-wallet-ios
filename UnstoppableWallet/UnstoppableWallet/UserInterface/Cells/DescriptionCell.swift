@@ -1,8 +1,8 @@
 import UIKit
 
 class DescriptionCell: UITableViewCell {
-    private static let horizontalPadding: CGFloat = .margin6x
-    private static let verticalPadding: CGFloat = .margin3x
+    private static let horizontalPadding: CGFloat = .margin32
+    private static let verticalPadding: CGFloat = .margin12
     private static let font: UIFont = .body
 
     private let label = UILabel()
@@ -36,9 +36,9 @@ class DescriptionCell: UITableViewCell {
 
 extension DescriptionCell {
 
-    static func height(containerWidth: CGFloat, text: String) -> CGFloat {
+    static func height(containerWidth: CGFloat, text: String, ignoreBottomMargin: Bool = false) -> CGFloat {
         let textHeight = text.height(forContainerWidth: containerWidth - 2 * horizontalPadding, font: font)
-        return textHeight + 2 * verticalPadding
+        return textHeight + (ignoreBottomMargin ? 1 : 2) * verticalPadding
     }
 
 }

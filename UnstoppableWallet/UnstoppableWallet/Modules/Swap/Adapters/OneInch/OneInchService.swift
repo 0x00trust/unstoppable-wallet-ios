@@ -4,7 +4,7 @@ import HsToolKit
 import UniswapKit
 import CurrencyKit
 import BigInt
-import EthereumKit
+import EvmKit
 import Foundation
 import MarketKit
 
@@ -29,6 +29,9 @@ class OneInchService {
     private let errorsRelay = PublishRelay<[Error]>()
     private(set) var errors: [Error] = [] {
         didSet {
+            if oldValue.isEmpty && errors.isEmpty {
+                return
+            }
             errorsRelay.accept(errors)
         }
     }
@@ -49,7 +52,7 @@ class OneInchService {
 
     private let scheduler = SerialDispatchQueueScheduler(qos: .userInitiated, internalSerialQueueName: "io.horizontalsystems.unstoppable.swap_service")
 
-    init(dex: SwapModule.Dex, evmKit: EthereumKit.Kit, tradeService: OneInchTradeService, allowanceService: SwapAllowanceService, pendingAllowanceService: SwapPendingAllowanceService, adapterManager: AdapterManager) {
+    init(dex: SwapModule.Dex, evmKit: EvmKit.Kit, tradeService: OneInchTradeService, allowanceService: SwapAllowanceService, pendingAllowanceService: SwapPendingAllowanceService, adapterManager: AdapterManager) {
         self.dex = dex
         self.tradeService = tradeService
         self.allowanceService = allowanceService
@@ -60,13 +63,13 @@ class OneInchService {
             self?.onUpdateTrade(state: state)
         }
 
-        subscribe(scheduler, disposeBag, tradeService.platformCoinInObservable) { [weak self] platformCoin in
-            self?.onUpdate(platformCoinIn: platformCoin)
+        subscribe(scheduler, disposeBag, tradeService.tokenInObservable) { [weak self] token in
+            self?.onUpdate(tokenIn: token)
         }
-        onUpdate(platformCoinIn: tradeService.platformCoinIn)
+        onUpdate(tokenIn: tradeService.tokenIn)
 
-        subscribe(scheduler, disposeBag, tradeService.platformCoinOutObservable) { [weak self] platformCoin in
-            self?.onUpdate(platformCoinOut: platformCoin)
+        subscribe(scheduler, disposeBag, tradeService.tokenOutObservable) { [weak self] token in
+            self?.onUpdate(tokenOut: token)
         }
 
         subscribe(scheduler, disposeBag, tradeService.amountInObservable) { [weak self] amount in
@@ -84,22 +87,36 @@ class OneInchService {
         syncState()
     }
 
-    private func onUpdate(platformCoinIn: PlatformCoin?) {
-        balanceIn = platformCoinIn.flatMap { balance(platformCoin: $0) }
-        allowanceService.set(platformCoin: platformCoinIn)
-        pendingAllowanceService.set(platformCoin: platformCoinIn)
+    private func onUpdate(tokenIn: MarketKit.Token?) {
+        balanceIn = tokenIn.flatMap { balance(token: $0) }
+        allowanceService.set(token: tokenIn)
+        pendingAllowanceService.set(token: tokenIn)
     }
 
     private func onUpdate(amountIn: Decimal?) {
         syncState()
     }
 
-    private func onUpdate(platformCoinOut: PlatformCoin?) {
-        balanceOut = platformCoinOut.flatMap { balance(platformCoin: $0) }
+    private func onUpdate(tokenOut: MarketKit.Token?) {
+        balanceOut = tokenOut.flatMap { balance(token: $0) }
     }
 
     private func onUpdateAllowanceState() {
         syncState()
+    }
+
+    private func checkAllowanceError(allowance: CoinValue) -> Error? {
+        guard let balanceIn = balanceIn,
+              balanceIn >= tradeService.amountIn,
+              tradeService.amountIn > allowance.value else {
+            return nil
+        }
+
+        if SwapModule.mustBeRevoked(token: tradeService.tokenIn), allowance.value != 0 {
+            return SwapModule.SwapError.needRevokeAllowance(allowance: allowance)
+        }
+
+        return SwapModule.SwapError.insufficientAllowance
     }
 
     private func syncState() {
@@ -122,8 +139,8 @@ class OneInchService {
             case .loading:
                 loading = true
             case .ready(let allowance):
-                if tradeService.amountIn > allowance.value {
-                    allErrors.append(SwapModule.SwapError.insufficientAllowance)
+                if let error = checkAllowanceError(allowance: allowance) {
+                    allErrors.append(error)
                 }
             case .notReady(let error):
                 allErrors.append(error)
@@ -153,8 +170,8 @@ class OneInchService {
         }
     }
 
-    private func balance(platformCoin: PlatformCoin) -> Decimal? {
-        (adapterManager.adapter(for: platformCoin) as? IBalanceAdapter)?.balanceData.balance
+    private func balance(token: MarketKit.Token) -> Decimal? {
+        (adapterManager.adapter(for: token) as? IBalanceAdapter)?.balanceData.balance
     }
 
 }
@@ -177,8 +194,9 @@ extension OneInchService: ISwapErrorProvider {
         balanceOutRelay.asObservable()
     }
 
-    var approveData: SwapAllowanceService.ApproveData? {
-        guard let amount = balanceIn else {
+    func approveData(amount: Decimal? = nil)  -> SwapAllowanceService.ApproveData? {
+        let amount = amount ?? balanceIn
+        guard let amount = amount else {
             return nil
         }
 

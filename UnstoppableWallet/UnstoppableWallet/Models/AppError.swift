@@ -2,13 +2,16 @@ import Foundation
 
 enum AppError: Error {
     case noConnection
+    case invalidResponse(reason: String)
     case binance(reason: BinanceError)
     case zcash(reason: ZcashError)
     case ethereum(reason: EthereumError)
     case oneInch(reason: OneInchError)
+    case invalidWords(count: Int)
     case wordsChecksum
     case addressInvalid
     case notSupportedByHodler
+    case weakReference
     case unknownError
 
     enum BinanceError: Error {
@@ -41,6 +44,7 @@ extension AppError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noConnection: return "alert.no_internet".localized
+        case .invalidResponse(let reason): return reason
         case .binance(let reason):
             switch reason {
             case .memoRequired: return "error.send_binance.memo_required".localized
@@ -63,10 +67,13 @@ extension AppError: LocalizedError {
             case .cannotEstimate: return "" // localized in modules
             case .insufficientLiquidity: return "swap.one_inch.error.insufficient_liquidity".localized
             }
+        case .invalidWords(let count):
+            return "restore_error.mnemonic_word_count".localized("\(count)")
         case .wordsChecksum:
             return "restore.checksum_error".localized
         case .addressInvalid: return "send.error.invalid_address".localized
         case .notSupportedByHodler: return "send.hodler_error.unsupported_address".localized
+        case .weakReference: return "Weak Reference"
         case .unknownError: return "Unknown Error"
         }
 

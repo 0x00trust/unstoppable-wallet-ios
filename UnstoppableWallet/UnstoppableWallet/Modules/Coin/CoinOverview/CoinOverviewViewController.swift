@@ -12,56 +12,38 @@ class CoinOverviewViewController: ThemeViewController {
     private let viewModel: CoinOverviewViewModel
     private let chartViewModel: CoinChartViewModel
     private let markdownParser: CoinPageMarkdownParser
-    private var urlManager: IUrlManager
+    private var urlManager: UrlManager
     private let disposeBag = DisposeBag()
 
     private var viewItem: CoinOverviewViewModel.ViewItem?
 
     private let tableView = SectionsTableView(style: .grouped)
-    private let coinInfoCell = A7Cell()
     private let spinner = HUDActivityView.create(with: .medium24)
-    private let errorView = MarketListErrorView()
+    private let errorView = PlaceholderViewModule.reachabilityView()
 
     /* Chart section */
-    private let currentRateCell: CoinChartRateCell
-
-    private let chartIntervalAndSelectedRateCell = ChartIntervalAndSelectedRateCell()
-    private let intervalRow: StaticRow
-
-    private let chartViewCell: ChartViewCell
+    private let chartCell: ChartCell
     private let chartRow: StaticRow
-
-    private let indicatorSelectorCell = IndicatorSelectorCell()
 
     /* Description */
     private let descriptionTextCell = ReadMoreTextCell()
 
     weak var parentNavigationController: UINavigationController?
 
-    init(viewModel: CoinOverviewViewModel, chartViewModel: CoinChartViewModel, configuration: ChartConfiguration, markdownParser: CoinPageMarkdownParser, urlManager: IUrlManager) {
+    init(viewModel: CoinOverviewViewModel, chartViewModel: CoinChartViewModel, configuration: ChartConfiguration, markdownParser: CoinPageMarkdownParser, urlManager: UrlManager) {
         self.viewModel = viewModel
         self.chartViewModel = chartViewModel
         self.markdownParser = markdownParser
         self.urlManager = urlManager
 
-        currentRateCell = CoinChartRateCell(viewModel: chartViewModel)
-
-        intervalRow = StaticRow(
-                cell: chartIntervalAndSelectedRateCell,
-                id: "chartIntervalAndSelectedRate",
-                height: .heightSingleLineCell
-        )
-
-        chartViewCell = ChartViewCell(configuration: configuration, isLast: false)
+        chartCell = ChartCell(viewModel: chartViewModel, touchDelegate: chartViewModel, viewOptions: ChartCell.coinChart, configuration: configuration)
         chartRow = StaticRow(
-                cell: chartViewCell,
+                cell: chartCell,
                 id: "chartView",
-                height: ChartViewCell.cellHeight
+                height: chartCell.cellHeight
         )
 
         super.init()
-
-        chartViewCell.delegate = chartViewModel
 
         hidesBottomBarWhenPushed = true
     }
@@ -72,28 +54,6 @@ class CoinOverviewViewController: ThemeViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-
-        coinInfoCell.set(backgroundStyle: .transparent, isFirst: true, isLast: true)
-        coinInfoCell.titleColor = .themeGray
-        coinInfoCell.set(titleImageSize: .iconSize24)
-        coinInfoCell.valueColor = .themeGray
-        coinInfoCell.selectionStyle = .none
-
-        let coinViewItem = viewModel.coinViewItem
-        coinInfoCell.title = coinViewItem.name
-        coinInfoCell.value = coinViewItem.marketCapRank
-        coinInfoCell.setTitleImage(urlString: coinViewItem.imageUrl, placeholder: UIImage(named: coinViewItem.imagePlaceholderName))
-
-        chartIntervalAndSelectedRateCell.bind(filters: chartViewModel.chartTypes.map {
-            .item(title: $0)
-        })
-        chartIntervalAndSelectedRateCell.onSelectInterval = { [weak self] index in
-            self?.chartViewModel.onSelectInterval(at: index)
-        }
-
-        indicatorSelectorCell.onTapIndicator = { [weak self] indicator in
-            self?.chartViewModel.onTap(indicator: indicator)
-        }
 
         descriptionTextCell.set(backgroundStyle: .transparent, isFirst: true)
         descriptionTextCell.onChangeHeight = { [weak self] in
@@ -120,7 +80,7 @@ class CoinOverviewViewController: ThemeViewController {
             maker.edges.equalToSuperview()
         }
 
-        errorView.onTapRetry = { [weak self] in self?.viewModel.onTapRetry() }
+        errorView.configureSyncError(action: { [weak self] in self?.onRetry() })
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { maker in
@@ -134,11 +94,6 @@ class CoinOverviewViewController: ThemeViewController {
 
         tableView.showsVerticalScrollIndicator = false
 
-        tableView.registerCell(forClass: A1Cell.self)
-        tableView.registerCell(forClass: BCell.self)
-        tableView.registerCell(forClass: D7Cell.self)
-        tableView.registerCell(forClass: DB7Cell.self)
-        tableView.registerCell(forClass: C85CellNew.self)
         tableView.registerCell(forClass: PerformanceTableViewCell.self)
         tableView.registerCell(forClass: BrandFooterCell.self)
         tableView.registerCell(forClass: TextCell.self)
@@ -147,16 +102,11 @@ class CoinOverviewViewController: ThemeViewController {
         subscribe(disposeBag, viewModel.loadingDriver) { [weak self] loading in
             self?.spinner.isHidden = !loading
         }
-        subscribe(disposeBag, viewModel.errorDriver) { [weak self] error in
-            if let error = error {
-                self?.errorView.text = error
-                self?.errorView.isHidden = false
-            } else {
-                self?.errorView.isHidden = true
-            }
+        subscribe(disposeBag, viewModel.syncErrorDriver) { [weak self] visible in
+            self?.errorView.isHidden = !visible
         }
 
-        subscribeViewModels()
+        chartRow.onReady = { [weak chartCell] in chartCell?.onLoad() }
 
         viewModel.onLoad()
         chartViewModel.viewDidLoad()
@@ -166,22 +116,9 @@ class CoinOverviewViewController: ThemeViewController {
         tableView.deselectCell(withCoordinator: transitionCoordinator, animated: animated)
     }
 
-    private func subscribeViewModels() {
-        // chart section
-        intervalRow.onReady = { [weak self] in self?.subscribeToInterval() }
-        chartRow.onReady = { [weak self] in self?.subscribeToChart() }
-    }
-
-    private func subscribeToInterval() {
-        subscribe(disposeBag, chartViewModel.pointSelectModeEnabledDriver) { [weak self] in self?.syncChart(selected: $0) }
-        subscribe(disposeBag, chartViewModel.pointSelectedItemDriver) { [weak self] in self?.syncChart(selectedViewItem: $0) }
-        subscribe(disposeBag, chartViewModel.chartTypeIndexDriver) { [weak self] in self?.syncChart(typeIndex: $0) }
-    }
-
-    private func subscribeToChart() {
-        subscribe(disposeBag, chartViewModel.loadingDriver) { [weak self] in self?.syncChart(loading: $0) }
-        subscribe(disposeBag, chartViewModel.errorDriver) { [weak self] in self?.syncChart(error: $0) }
-        subscribe(disposeBag, chartViewModel.chartInfoDriver) { [weak self] in self?.syncChart(viewItem: $0) }
+    @objc private func onRetry() {
+        viewModel.onTapRetry()
+        chartViewModel.retry()
     }
 
     private func sync(viewItem: CoinOverviewViewModel.ViewItem?) {
@@ -207,91 +144,59 @@ class CoinOverviewViewController: ThemeViewController {
 
 extension CoinOverviewViewController {
 
-    // Chart section
+    private func linkRow(id: String, image: String, title: String, isFirst: Bool, isLast: Bool, action: @escaping () -> ()) -> RowProtocol {
+        CellBuilder.selectableRow(
+                elements: [.image20, .text, .image20],
+                tableView: tableView,
+                id: id,
+                height: .heightCell48,
+                autoDeselect: true,
+                bind: { cell in
+                    cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
 
-    private func deactivateIndicators() {
-        ChartIndicatorSet.all.forEach { indicator in
-            indicatorSelectorCell.set(indicator: indicator, selected: false)
-            indicatorSelectorCell.set(indicator: indicator, disabled: true)
-        }
+                    cell.bind(index: 0) { (component: ImageComponent) in
+                        component.imageView.image = UIImage(named: image)?.withTintColor(.themeGray)
+                    }
+                    cell.bind(index: 1) { (component: TextComponent) in
+                        component.font = .body
+                        component.textColor = .themeLeah
+                        component.text = title
+                    }
+                    cell.bind(index: 2) { (component: ImageComponent) in
+                        component.imageView.image = UIImage(named: "arrow_big_forward_20")?.withTintColor(.themeGray)
+                    }
+                },
+                action: action
+        )
     }
 
-    private func syncChart(viewItem: CoinChartViewModel.ViewItem?) {
-        guard let viewItem = viewItem else {
-            return
-        }
-
-        chartViewCell.set(
-                data: viewItem.chartData,
-                trend: viewItem.chartTrend,
-                min: viewItem.minValue,
-                max: viewItem.maxValue,
-                timeline: viewItem.timeline)
-
-        guard let selectedIndicator = viewItem.selectedIndicator else {
-            chartViewCell.setVolumes(hidden: false, limitHidden: false)
-            ChartIndicatorSet.all.forEach { indicator in
-                chartViewCell.bind(indicator: indicator, hidden: true)
-            }
-            deactivateIndicators()
-
-            return
-        }
-
-        chartViewCell.setVolumes(hidden: selectedIndicator.hideVolumes, limitHidden: selectedIndicator.hideVolumes)
-
-        ChartIndicatorSet.all.forEach { indicator in
-            let show = selectedIndicator.contains(indicator)
-
-            chartViewCell.bind(indicator: indicator, hidden: !show)
-
-            indicatorSelectorCell.set(indicator: indicator, disabled: false)
-            indicatorSelectorCell.set(indicator: indicator, selected: show)
-        }
-    }
-
-    private func syncChart(selected: Bool) {
-        chartIntervalAndSelectedRateCell.bind(displayMode: selected ? .selectedRate : .interval)
-    }
-
-    private func syncChart(selectedViewItem: SelectedPointViewItem?) {
-        guard let viewItem = selectedViewItem else {
-            return
-        }
-        chartIntervalAndSelectedRateCell.bind(selectedPointViewItem: viewItem)
-    }
-
-    private func syncChart(typeIndex: Int) {
-        chartIntervalAndSelectedRateCell.select(index: typeIndex)
-    }
-
-    private func syncChart(loading: Bool) {
-        if loading {
-            chartViewCell.showLoading()
-            deactivateIndicators()
-        } else {
-            chartViewCell.hideLoading()
-        }
-    }
-
-    private func syncChart(error: String?) { //todo: check logic!
-        if error != nil {
-            deactivateIndicators()
-        }
-    }
-
-}
-
-extension CoinOverviewViewController {
-
-    private var coinInfoSection: SectionProtocol {
+    private func coinInfoSection(viewItem: CoinOverviewViewModel.CoinViewItem) -> SectionProtocol {
         Section(
                 id: "coin-info",
                 rows: [
-                    StaticRow(
-                            cell: coinInfoCell,
+                    CellBuilder.row(
+                            elements: [.image24, .text, .text],
+                            tableView: tableView,
                             id: "coin-info",
-                            height: .heightCell48
+                            height: .heightCell48,
+                            bind: { cell in
+                                cell.set(backgroundStyle: .transparent, isFirst: true, isLast: false)
+                                cell.selectionStyle = .none
+
+                                cell.bind(index: 0) { (component: ImageComponent) in
+                                    component.setImage(urlString: viewItem.imageUrl, placeholder: UIImage(named: viewItem.imagePlaceholderName))
+                                }
+                                cell.bind(index: 1) { (component: TextComponent) in
+                                    component.font = .body
+                                    component.textColor = .themeGray
+                                    component.text = viewItem.name
+                                }
+                                cell.bind(index: 2) { (component: TextComponent) in
+                                    component.font = .subhead1
+                                    component.textColor = .themeGray
+                                    component.text = viewItem.marketCapRank
+                                }
+                            }
                     )
                 ]
         )
@@ -300,38 +205,13 @@ extension CoinOverviewViewController {
     private var chartSection: SectionProtocol {
         Section(
                 id: "chart",
-                rows: [
-                    StaticRow(
-                            cell: currentRateCell,
-                            id: "currentRate",
-                            height: ChartCurrentRateCell.cellHeight
-                    ),
-                    intervalRow,
-                    chartRow,
-                    StaticRow(
-                            cell: indicatorSelectorCell,
-                            id: "indicatorSelector",
-                            height: .heightSingleLineCell
-                    )
-                ])
-    }
-
-    private func headerRow(title: String) -> RowProtocol {
-        Row<BCell>(
-                id: "header_cell_\(title)",
-                hash: title,
-                height: .heightCell48,
-                bind: { cell, _ in
-                    cell.set(backgroundStyle: .transparent)
-                    cell.selectionStyle = .none
-                    cell.title = title
-                }
+                rows: [chartRow]
         )
     }
 
     private func descriptionSection(description: String) -> SectionProtocol {
         var rows: [RowProtocol] = [
-            headerRow(title: "chart.about.header".localized)
+            tableView.subtitleRow(text: "chart.about.header".localized)
         ]
 
         descriptionTextCell.contentText = try? markdownParser.attributedString(from: description)
@@ -357,15 +237,13 @@ extension CoinOverviewViewController {
         if let guideUrl = guideUrl {
             let isLast = links.isEmpty
 
-            let guideRow = Row<A1Cell>(
+            let guideRow = linkRow(
                     id: "guide",
-                    height: .heightCell48,
-                    bind: { cell, _ in
-                        cell.set(backgroundStyle: .lawrence, isFirst: true, isLast: isLast)
-                        cell.titleImage = UIImage(named: "academy_1_20")
-                        cell.title = "coin_page.guide".localized
-                    },
-                    action: { [weak self] _ in
+                    image: "academy_1_20",
+                    title: "coin_page.guide".localized,
+                    isFirst: true,
+                    isLast: isLast,
+                    action: { [weak self] in
                         let module = MarkdownModule.viewController(url: guideUrl)
                         self?.parentNavigationController?.pushViewController(module, animated: true)
                     }
@@ -377,20 +255,14 @@ extension CoinOverviewViewController {
         return Section(
                 id: "links",
                 headerState: .margin(height: .margin12),
-                rows: [headerRow(title: "coin_page.links".localized)] + guideRows + links.enumerated().map { index, link in
-                    let isFirst = guideRows.isEmpty && index == 0
-                    let isLast = index == links.count - 1
-
-                    return Row<A1Cell>(
+                rows: [tableView.subtitleRow(text: "coin_page.links".localized)] + guideRows + links.enumerated().map { index, link in
+                    linkRow(
                             id: link.title,
-                            height: .heightCell48,
-                            autoDeselect: true,
-                            bind: { cell, _ in
-                                cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
-                                cell.titleImage = UIImage(named: link.iconName)
-                                cell.title = link.title
-                            },
-                            action: { [weak self] _ in
+                            image: link.iconName,
+                            title: link.title,
+                            isFirst: guideRows.isEmpty && index == 0,
+                            isLast: index == links.count - 1,
+                            action: { [weak self] in
                                 self?.openLink(url: link.url)
                             }
                     )
@@ -454,7 +326,7 @@ extension CoinOverviewViewController {
                 id: "categories",
                 headerState: .margin(height: .margin12),
                 rows: [
-                    headerRow(title: "coin_page.category".localized),
+                    tableView.subtitleRow(text: "coin_page.category".localized),
                     Row<TextCell>(
                             id: "categories",
                             dynamicHeight: { width in
@@ -468,62 +340,92 @@ extension CoinOverviewViewController {
         )
     }
 
+    private func contractRow(viewItem: CoinOverviewViewModel.ContractViewItem, index: Int, isFirst: Bool, isLast: Bool) -> RowProtocol {
+        CellBuilder.row(
+                elements: [.image24, .text, .secondaryCircleButton, .secondaryCircleButton],
+                tableView: tableView,
+                id: "contract-\(index)",
+                height: .heightCell48,
+                bind: { [weak self] cell in
+                    cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
+
+                    cell.bind(index: 0) { (component: ImageComponent) in
+                        component.setImage(urlString: viewItem.iconUrl, placeholder: nil)
+                    }
+
+                    cell.bind(index: 1) { (component: TextComponent) in
+                        component.font = .subhead2
+                        component.textColor = .themeGray
+                        component.lineBreakMode = .byTruncatingMiddle
+                        component.text = viewItem.title
+                    }
+
+                    cell.bind(index: 2) { (component: SecondaryCircleButtonComponent) in
+                        component.button.set(image: UIImage(named: "copy_20"))
+                        component.onTap = {
+                            CopyHelper.copyAndNotify(value: viewItem.reference)
+                        }
+                    }
+
+                    cell.bind(index: 3) { (component: SecondaryCircleButtonComponent) in
+                        if let explorerUrl = viewItem.explorerUrl {
+                            component.isHidden = false
+                            component.button.set(image: UIImage(named: "globe_20"))
+                            component.onTap = { [weak self] in
+                                self?.urlManager.open(url: explorerUrl, from: self?.parentNavigationController)
+                            }
+                        } else {
+                            component.isHidden = true
+                        }
+                    }
+                }
+        )
+    }
+
     private func contractsSection(contracts: [CoinOverviewViewModel.ContractViewItem]) -> SectionProtocol {
         Section(
                 id: "contract-info",
                 headerState: .margin(height: .margin12),
-                rows: [headerRow(title: "coin_page.contracts".localized)] +
-                        contracts.enumerated().map { index, contractViewItem in
-                            Row<C85CellNew>(
-                                    id: "contract-info",
-                                    height: .heightCell48,
-                                    bind: { cell, _ in
-                                        cell.selectionStyle = .none
-                                        cell.set(backgroundStyle: .lawrence, isFirst: index <= 0, isLast: index >= contracts.count - 1)
-
-                                        cell.titleStyle = .subhead2Grey
-                                        cell.title = contractViewItem.reference
-                                        cell.titleImage = UIImage(named: contractViewItem.iconName)
-                                        cell.firstImage = UIImage(named: "copy_20")
-                                        cell.secondImage = UIImage(named: "globe_20")
-
-                                        cell.leftAction = {
-                                            UIPasteboard.general.setValue(contractViewItem.reference, forPasteboardType: "public.plain-text")
-                                            HudHelper.instance.showSuccess(title: "alert.copied".localized)
-                                        }
-
-                                        cell.rightAction = { [weak self] in
-                                            self?.urlManager.open(url: contractViewItem.explorerUrl, from: self?.parentNavigationController)
-                                        }
-                                    }
-                            )
+                rows: [tableView.subtitleRow(text: "coin_page.contracts".localized)] +
+                        contracts.enumerated().map { index, viewItem in
+                            contractRow(viewItem: viewItem, index: index, isFirst: index == 0, isLast: index == contracts.count - 1)
                         }
         )
     }
 
     private func marketRow(id: String, title: String, badge: String?, text: String, isFirst: Bool, isLast: Bool) -> RowProtocol {
-        if let badge = badge {
-            return Row<DB7Cell>(
-                    id: id,
-                    height: .heightCell48,
-                    bind: { cell, _ in
-                        cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
-                        cell.title = title
-                        cell.titleBadgeText = badge
-                        cell.value = text
+        CellBuilder.row(
+                elements: [.text, .margin8, .badge, .text],
+                tableView: tableView,
+                id: id,
+                height: .heightCell48,
+                bind: { cell in
+                    cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
+
+                    cell.bind(index: 0) { (component: TextComponent) in
+                        component.font = .subhead2
+                        component.textColor = .themeGray
+                        component.text = title
+                        component.setContentHuggingPriority(.required, for: .horizontal)
                     }
-            )
-        } else {
-            return Row<D7Cell>(
-                    id: id,
-                    height: .heightCell48,
-                    bind: { cell, _ in
-                        cell.set(backgroundStyle: .lawrence, isFirst: isFirst, isLast: isLast)
-                        cell.title = title
-                        cell.value = text
+                    cell.bind(index: 1) { (component: BadgeComponent) in
+                        component.badgeView.set(style: .small)
+
+                        if let badge = badge {
+                            component.badgeView.text = badge
+                            component.isHidden = false
+                        } else {
+                            component.isHidden = true
+                        }
                     }
-            )
-        }
+                    cell.bind(index: 2) { (component: TextComponent) in
+                        component.font = .subhead1
+                        component.textColor = .themeLeah
+                        component.text = text
+                        component.textAlignment = .right
+                    }
+                }
+        )
     }
 
     private func marketInfoSection(viewItem: CoinOverviewViewModel.ViewItem) -> SectionProtocol? {
@@ -584,7 +486,7 @@ extension CoinOverviewViewController: SectionsDataSource {
         var sections = [SectionProtocol]()
 
         if let viewItem = viewItem {
-            sections.append(coinInfoSection)
+            sections.append(coinInfoSection(viewItem: viewItem.coinViewItem))
             sections.append(chartSection)
 
             if let marketInfoSection = marketInfoSection(viewItem: viewItem) {

@@ -1,4 +1,4 @@
-import Foundation
+import UIKit
 import Chart
 import LanguageKit
 import CurrencyKit
@@ -7,12 +7,22 @@ import ThemeKit
 extension ChartConfiguration {
 
     static var fullChart: ChartConfiguration {
-        ChartConfiguration().applyColors()
+        let configuration = ChartConfiguration().applyColors()
+
+        configuration.mainHeight = ChartCell.chartHeight
+        configuration.indicatorHeight = ChartCell.indicatorHeight
+        configuration.timelineHeight = ChartCell.timelineHeight
+
+        return configuration
     }
 
     static var chartWithoutIndicators: ChartConfiguration {
         let configuration = ChartConfiguration().applyColors()
+
+        configuration.mainHeight = ChartCell.chartHeight
         configuration.showIndicators = false
+        configuration.indicatorHeight = 0
+        configuration.timelineHeight = ChartCell.timelineHeight
         configuration.timelineInsets = UIEdgeInsets(top: 4, left: 8, bottom: 0, right: 8)
 
         return configuration
@@ -25,10 +35,10 @@ extension ChartConfiguration {
         return configuration
     }
 
-    static var smallChart: ChartConfiguration {
+    static var chartPreview: ChartConfiguration {
         let config = ChartConfiguration().applyColors()
 
-        config.mainHeight = .margin32 + .margin2
+        config.mainHeight = 25
         config.indicatorHeight = 0
         config.timelineHeight = 0
         config.curvePadding = UIEdgeInsets(top: .margin2, left: 0, bottom: 10, right: 0)
@@ -38,6 +48,12 @@ extension ChartConfiguration {
         config.showLimits = false
         config.showVerticalLines = false
         config.isInteractive = false
+
+        let clear = [UIColor.clear]
+        config.trendUpGradient = clear
+        config.trendDownGradient = clear
+        config.pressedGradient = clear
+        config.neutralGradient = clear
 
         return config
     }
@@ -51,13 +67,14 @@ extension ChartConfiguration {
         pressedColor = .themeNina
         outdatedColor = .themeNina
 
-        trendUpGradient = [UIColor(hex: 0x416BFF), UIColor(hex: 0x13D670)]
-        trendDownGradient = [UIColor(hex: 0x7413D6), UIColor(hex: 0xFF0303)]
-        pressedGradient = [UIColor.themeOz, UIColor.themeOz]
-        neutralGradient = [UIColor.themeGray50, UIColor.themeGray50]
-        gradientAlphas = [0.05, 0.3]
+        trendUpGradient = [UIColor](repeatElement(UIColor(hex: 0x13D670), count: 3))
+        trendDownGradient = [UIColor(hex: 0x7413D6), UIColor(hex: 0x7413D6), UIColor(hex: 0xFF0303)]
+        pressedGradient = [UIColor](repeatElement(.themeLeah, count: 3))
+        neutralGradient = [UIColor](repeatElement(.themeGray50, count: 3))
+        gradientLocations = [0, 0.05, 1]
+        gradientAlphas = [0, 0, 0.3]
 
-        limitLinesColor = .themeNina
+        limitLinesColor = .themeSteel20
         limitTextColor = .themeNina
         limitTextFont = .caption
         verticalLinesColor = .themeSteel10

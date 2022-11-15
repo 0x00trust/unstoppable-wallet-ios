@@ -1,15 +1,15 @@
 import Foundation
-import EthereumKit
+import EvmKit
 import RxSwift
 import RxRelay
 import MarketKit
 
 class SwapPendingAllowanceService {
-    private let spenderAddress: EthereumKit.Address
+    private let spenderAddress: EvmKit.Address
     private let adapterManager: AdapterManager
     private let allowanceService: SwapAllowanceService
 
-    private var platformCoin: PlatformCoin?
+    private var token: Token?
     private var pendingAllowance: Decimal?
 
     private let disposeBag = DisposeBag()
@@ -23,7 +23,7 @@ class SwapPendingAllowanceService {
         }
     }
 
-    init(spenderAddress: EthereumKit.Address, adapterManager: AdapterManager, allowanceService: SwapAllowanceService) {
+    init(spenderAddress: EvmKit.Address, adapterManager: AdapterManager, allowanceService: SwapAllowanceService) {
         self.spenderAddress = spenderAddress
         self.adapterManager = adapterManager
         self.allowanceService = allowanceService
@@ -39,20 +39,21 @@ class SwapPendingAllowanceService {
     private func sync() {
 //        print("Pending allowance: \(pendingAllowance ?? -1)")
         guard let pendingAllowance = pendingAllowance else {
-            print("new state: .notAllowed")
             state = .notAllowed
             return
         }
 
 //        print("allowance state: \(allowanceService.state)")
         guard case .ready(let allowance) = allowanceService.state else {
-            print("new state: .notAllowed")
             state = .notAllowed
             return
         }
 
-//        print("new state: \(pendingAllowance != allowance.value ? State.pending : State.approved)")
-        state = pendingAllowance != allowance.value ? .pending : .approved
+        if pendingAllowance != allowance.value {
+            state = pendingAllowance == 0 ? .revoking : .pending
+        } else {
+            state = .approved
+        }
     }
 
 }
@@ -63,15 +64,15 @@ extension SwapPendingAllowanceService {
         stateRelay.asObservable()
     }
 
-    func set(platformCoin: PlatformCoin?) {
-        self.platformCoin = platformCoin
+    func set(token: Token?) {
+        self.token = token
         pendingAllowance = nil
 
         syncAllowance()
     }
 
     func syncAllowance() {
-        guard let platformCoin = platformCoin, let adapter = adapterManager.adapter(for: platformCoin) as? IErc20Adapter else {
+        guard let token = token, let adapter = adapterManager.adapter(for: token) as? IErc20Adapter else {
             return
         }
 
@@ -89,7 +90,7 @@ extension SwapPendingAllowanceService {
 extension SwapPendingAllowanceService {
 
     enum State: Int {
-        case notAllowed, pending, approved
+        case notAllowed, revoking, pending, approved
     }
 
 }

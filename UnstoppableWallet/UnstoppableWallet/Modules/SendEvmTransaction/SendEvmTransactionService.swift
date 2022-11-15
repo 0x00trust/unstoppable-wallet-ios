@@ -1,7 +1,7 @@
 import Foundation
 import RxSwift
 import RxCocoa
-import EthereumKit
+import EvmKit
 import BigInt
 import MarketKit
 import UniswapKit
@@ -16,8 +16,9 @@ protocol ISendEvmTransactionService {
     var sendState: SendEvmTransactionService.SendState { get }
     var sendStateObservable: Observable<SendEvmTransactionService.SendState> { get }
 
-    var ownAddress: EthereumKit.Address { get }
+    var ownAddress: EvmKit.Address { get }
 
+    func methodName(input: Data) -> String?
     func send()
 }
 
@@ -27,7 +28,7 @@ class SendEvmTransactionService {
     private let sendData: SendEvmData
     private let evmKitWrapper: EvmKitWrapper
     private let feeService: EvmFeeService
-    private let activateCoinManager: ActivateCoinManager
+    private let evmLabelManager: EvmLabelManager
 
     private let stateRelay = PublishRelay<State>()
     private(set) var state: State = .notReady(errors: [], warnings: []) {
@@ -45,11 +46,11 @@ class SendEvmTransactionService {
         }
     }
 
-    init(sendData: SendEvmData, evmKitWrapper: EvmKitWrapper, feeService: EvmFeeService, activateCoinManager: ActivateCoinManager) {
+    init(sendData: SendEvmData, evmKitWrapper: EvmKitWrapper, feeService: EvmFeeService, evmLabelManager: EvmLabelManager) {
         self.sendData = sendData
         self.evmKitWrapper = evmKitWrapper
         self.feeService = feeService
-        self.activateCoinManager = activateCoinManager
+        self.evmLabelManager = evmLabelManager
 
         dataState = DataState(
                 transactionData: sendData.transactionData,
@@ -60,7 +61,7 @@ class SendEvmTransactionService {
         subscribe(disposeBag, feeService.statusObservable) { [weak self] in self?.sync(status: $0) }
     }
 
-    private var evmKit: EthereumKit.Kit {
+    private var evmKit: EvmKit.Kit {
         evmKitWrapper.evmKit
     }
 
@@ -98,41 +99,6 @@ class SendEvmTransactionService {
         )
     }
 
-    private func handlePostSendActions() {
-        if let decoration = dataState.decoration as? SwapMethodDecoration {
-            activateUniswap(token: decoration.tokenIn)
-            activateUniswap(token: decoration.tokenOut)
-        }
-
-        if let decoration = dataState.decoration as? OneInchMethodDecoration {
-            var tokens = [OneInchMethodDecoration.Token]()
-
-            switch decoration {
-            case let method as OneInchUnoswapMethodDecoration:
-                tokens = [method.tokenIn, method.tokenOut].compactMap { $0 }
-            case let method as OneInchSwapMethodDecoration:
-                tokens = [method.tokenIn, method.tokenOut].compactMap { $0 }
-            default: ()
-            }
-
-            tokens.forEach { activateOneInch(token: $0) }
-        }
-    }
-
-    private func activateUniswap(token: SwapMethodDecoration.Token) {
-        switch token {
-        case .evmCoin: activateCoinManager.activateBaseCoin(blockchain: evmKitWrapper.blockchain)
-        case .eip20Coin(let address): activateCoinManager.activateEvm20Coin(address: address.hex, blockchain: evmKitWrapper.blockchain)
-        }
-    }
-
-    private func activateOneInch(token: OneInchMethodDecoration.Token) {
-        switch token {
-        case .evmCoin: activateCoinManager.activateBaseCoin(blockchain: evmKitWrapper.blockchain)
-        case .eip20Coin(let address): activateCoinManager.activateEvm20Coin(address: address.hex, blockchain: evmKitWrapper.blockchain)
-        }
-    }
-
 }
 
 extension SendEvmTransactionService: ISendEvmTransactionService {
@@ -145,8 +111,12 @@ extension SendEvmTransactionService: ISendEvmTransactionService {
         sendStateRelay.asObservable()
     }
 
-    var ownAddress: EthereumKit.Address {
+    var ownAddress: EvmKit.Address {
         evmKit.receiveAddress
+    }
+
+    func methodName(input: Data) -> String? {
+        evmLabelManager.methodLabel(input: input)
     }
 
     func send() {
@@ -159,13 +129,12 @@ extension SendEvmTransactionService: ISendEvmTransactionService {
 
         evmKitWrapper.sendSingle(
                         transactionData: transaction.transactionData,
-                        gasPrice: transaction.gasData.gasPrice,
-                        gasLimit: transaction.gasData.gasLimit,
+                        gasPrice: transaction.gasData.price,
+                        gasLimit: transaction.gasData.limit,
                         nonce: transaction.transactionData.nonce
                 )
                 .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .userInitiated))
                 .subscribe(onSuccess: { [weak self] fullTransaction in
-                    self?.handlePostSendActions()
                     self?.sendState = .sent(transactionHash: fullTransaction.transaction.hash)
                 }, onError: { error in
                     self.sendState = .failed(error: error)
@@ -185,7 +154,7 @@ extension SendEvmTransactionService {
     struct DataState {
         let transactionData: TransactionData?
         let additionalInfo: SendEvmData.AdditionInfo?
-        var decoration: ContractMethodDecoration?
+        var decoration: TransactionDecoration?
     }
 
     enum SendState {

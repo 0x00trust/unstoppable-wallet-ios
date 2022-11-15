@@ -1,12 +1,12 @@
 import RxSwift
 
 class AboutService {
-    private let termsManager: ITermsManager
-    private let systemInfoManager: ISystemInfoManager
+    private let termsManager: TermsManager
+    private let systemInfoManager: SystemInfoManager
     private let appConfigProvider: AppConfigProvider
-    private let rateAppManager: IRateAppManager
+    private let rateAppManager: RateAppManager
 
-    init(termsManager: ITermsManager, systemInfoManager: ISystemInfoManager, appConfigProvider: AppConfigProvider, rateAppManager: IRateAppManager) {
+    init(termsManager: TermsManager, systemInfoManager: SystemInfoManager, appConfigProvider: AppConfigProvider, rateAppManager: RateAppManager) {
         self.termsManager = termsManager
         self.systemInfoManager = systemInfoManager
         self.appConfigProvider = appConfigProvider
@@ -39,6 +39,10 @@ extension AboutService {
 
     var appVersion: String {
         systemInfoManager.appVersion.description
+    }
+
+    var twitterAccount: String {
+        appConfigProvider.appTwitterAccount
     }
 
     func rateApp() {

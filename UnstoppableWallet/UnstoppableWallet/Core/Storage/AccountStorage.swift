@@ -1,11 +1,13 @@
+import Foundation
 import StorageKit
-import EthereumKit
+import EvmKit
+import HdWalletKit
 
 class AccountStorage {
     private let secureStorage: ISecureStorage
-    private let storage: IAccountRecordStorage
+    private let storage: AccountRecordStorage
 
-    init(secureStorage: ISecureStorage, storage: IAccountRecordStorage) {
+    init(secureStorage: ISecureStorage, storage: AccountRecordStorage) {
         self.secureStorage = secureStorage
         self.storage = storage
     }
@@ -32,18 +34,28 @@ class AccountStorage {
             }
 
             type = .mnemonic(words: words, salt: salt)
-        case .privateKey:
+        case .evmPrivateKey:
             guard let data = recoverData(id: id, typeName: typeName, keyName: .data) else {
                 return nil
             }
 
-            type = .privateKey(data: data)
-        case .address:
+            type = .evmPrivateKey(data: data)
+        case .evmAddress:
             guard let data = recoverData(id: id, typeName: typeName, keyName: .data) else {
                 return nil
             }
 
-            type = .address(address: EthereumKit.Address(raw: data))
+            type = .evmAddress(address: EvmKit.Address(raw: data))
+        case .hdExtendedKey:
+            guard let data = recoverData(id: id, typeName: typeName, keyName: .data) else {
+                return nil
+            }
+
+            guard let key = try? HDExtendedKey.deserialize(data: data) else {
+                return nil
+            }
+
+            type = .hdExtendedKey(key: key)
         }
 
         return Account(
@@ -68,12 +80,15 @@ class AccountStorage {
             typeName = .mnemonic
             wordsKey = try store(stringArray: words, id: id, typeName: typeName, keyName: .words)
             saltKey = try store(salt, id: id, typeName: typeName, keyName: .salt)
-        case .privateKey(let data):
-            typeName = .privateKey
+        case .evmPrivateKey(let data):
+            typeName = .evmPrivateKey
             dataKey = try store(data: data, id: id, typeName: typeName, keyName: .data)
-        case .address(let address):
-            typeName = .address
+        case .evmAddress(let address):
+            typeName = .evmAddress
             dataKey = try store(data: address.raw, id: id, typeName: typeName, keyName: .data)
+        case .hdExtendedKey(let key):
+            typeName = .hdExtendedKey
+            dataKey = try store(data: key.serialized, id: id, typeName: typeName, keyName: .data)
         }
 
         return AccountRecord(
@@ -95,10 +110,12 @@ class AccountStorage {
         case .mnemonic:
             try secureStorage.removeValue(for: secureKey(id: id, typeName: .mnemonic, keyName: .words))
             try secureStorage.removeValue(for: secureKey(id: id, typeName: .mnemonic, keyName: .salt))
-        case .privateKey:
-            try secureStorage.removeValue(for: secureKey(id: id, typeName: .privateKey, keyName: .data))
-        case .address:
-            try secureStorage.removeValue(for: secureKey(id: id, typeName: .address, keyName: .data))
+        case .evmPrivateKey:
+            try secureStorage.removeValue(for: secureKey(id: id, typeName: .evmPrivateKey, keyName: .data))
+        case .evmAddress:
+            try secureStorage.removeValue(for: secureKey(id: id, typeName: .evmAddress, keyName: .data))
+        case .hdExtendedKey:
+            try secureStorage.removeValue(for: secureKey(id: id, typeName: .hdExtendedKey, keyName: .data))
         }
     }
 
@@ -142,17 +159,17 @@ class AccountStorage {
 extension AccountStorage {
 
     var allAccounts: [Account] {
-        storage.allAccountRecords.compactMap { createAccount(record: $0) }
+        storage.all.compactMap { createAccount(record: $0) }
     }
 
     func save(account: Account) {
         if let record = try? createRecord(account: account) {
-            storage.save(accountRecord: record)
+            storage.save(record: record)
         }
     }
 
     var lostAccountIds: [String] {
-        storage.allAccountRecords.compactMap { accountRecord in
+        storage.all.compactMap { accountRecord in
             if createAccount(record: accountRecord) == nil {
                 return accountRecord.id
             }
@@ -162,16 +179,16 @@ extension AccountStorage {
     }
 
     func delete(account: Account) {
-        storage.deleteAccountRecord(by: account.id)
+        storage.delete(by: account.id)
         try? clearSecureStorage(account: account)
     }
 
     func delete(accountId: String) {
-        storage.deleteAccountRecord(by: accountId)
+        storage.delete(by: accountId)
     }
 
     func clear() {
-        storage.deleteAllAccountRecords()
+        storage.clear()
     }
 
 }
@@ -180,15 +197,15 @@ extension AccountStorage {
 
     private enum TypeName: String {
         case mnemonic
-        case privateKey
-        case address
+        case evmPrivateKey
+        case evmAddress = "address"
+        case hdExtendedKey
     }
 
     private enum KeyName: String {
         case words
         case salt
         case data
-        case privateKey
     }
 
 }

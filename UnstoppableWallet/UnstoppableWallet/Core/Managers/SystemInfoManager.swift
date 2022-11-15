@@ -1,8 +1,9 @@
 import Foundation
+import UIKit
 import LocalAuthentication
 import RxSwift
 
-class SystemInfoManager: ISystemInfoManager {
+class SystemInfoManager {
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as! String

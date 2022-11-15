@@ -1,3 +1,5 @@
+import Foundation
+import UIKit
 import ThemeKit
 import SnapKit
 import SectionsTableView
@@ -13,7 +15,7 @@ class CoinMajorHoldersViewController: ThemeViewController {
 
     private let tableView = SectionsTableView(style: .grouped)
     private let spinner = HUDActivityView.create(with: .medium24)
-    private let errorView = MarketListErrorView()
+    private let errorView = PlaceholderViewModule.reachabilityView()
     private var chartCell = CoinMajorHolderChartCell()
 
     private var stateViewItem: CoinMajorHoldersViewModel.StateViewItem?
@@ -44,10 +46,6 @@ class CoinMajorHoldersViewController: ThemeViewController {
         tableView.separatorStyle = .none
         tableView.backgroundColor = .clear
 
-        tableView.registerCell(forClass: BCell.self)
-        tableView.registerCell(forClass: CoinMajorHolderCell.self)
-        tableView.registerHeaderFooter(forClass: BottomDescriptionHeaderFooterView.self)
-
         view.addSubview(spinner)
         spinner.snp.makeConstraints { maker in
             maker.center.equalToSuperview()
@@ -57,23 +55,22 @@ class CoinMajorHoldersViewController: ThemeViewController {
 
         view.addSubview(errorView)
         errorView.snp.makeConstraints { maker in
-            maker.edges.equalToSuperview()
+            maker.edges.equalTo(view.safeAreaLayoutGuide)
         }
 
-        errorView.onTapRetry = { [weak self] in self?.viewModel.refresh() }
+        errorView.configureSyncError(action: { [weak self] in self?.onRetry() })
 
         subscribe(disposeBag, viewModel.stateViewItemDriver) { [weak self] in self?.sync(stateViewItem: $0) }
         subscribe(disposeBag, viewModel.loadingDriver) { [weak self] loading in
             self?.spinner.isHidden = !loading
         }
-        subscribe(disposeBag, viewModel.errorDriver) { [weak self] error in
-            if let error = error {
-                self?.errorView.text = error
-                self?.errorView.isHidden = false
-            } else {
-                self?.errorView.isHidden = true
-            }
+        subscribe(disposeBag, viewModel.syncErrorDriver) { [weak self] visible in
+            self?.errorView.isHidden = !visible
         }
+    }
+
+    @objc private func onRetry() {
+        viewModel.onTapRetry()
     }
 
     private func sync(stateViewItem: CoinMajorHoldersViewModel.StateViewItem?) {
@@ -97,42 +94,48 @@ class CoinMajorHoldersViewController: ThemeViewController {
 
 extension CoinMajorHoldersViewController: SectionsDataSource {
 
-    private var headerRow: RowProtocol {
-        Row<BCell>(
-                id: "header",
-                height: .heightCell48,
-                bind: { cell, _ in
-                    cell.set(backgroundStyle: .transparent)
-                    cell.selectionStyle = .none
-                    cell.title = "coin_page.major_holders.top_ethereum_wallets".localized
-                }
-        )
-    }
-
     private func row(viewItem: CoinMajorHoldersViewModel.ViewItem, isLast: Bool) -> RowProtocol {
-        Row<CoinMajorHolderCell>(
+        CellBuilderNew.row(
+                rootElement: .hStack([
+                    .text { component in
+                        component.font = .captionSB
+                        component.textColor = .themeGray
+                        component.text = viewItem.order
+                        component.textAlignment = .center
+
+                        component.snp.remakeConstraints { maker in
+                            maker.width.equalTo(24)
+                        }
+                    },
+                    .text { component in
+                        component.font = .body
+                        component.textColor = .themeJacob
+                        component.text = viewItem.percent
+                    },
+                    .secondaryButton { component in
+                        component.button.set(style: .default)
+                        component.button.setTitle(viewItem.address.shortened, for: .normal)
+                        component.onTap = {
+                            CopyHelper.copyAndNotify(value: viewItem.address)
+                        }
+
+                        component.snp.remakeConstraints { maker in
+                            maker.width.equalTo(140)
+                        }
+                    },
+                    .margin8,
+                    .secondaryCircleButton { [weak self] component in
+                        component.button.set(image: UIImage(named: "globe_20"))
+                        component.onTap = {
+                            self?.open(address: viewItem.address)
+                        }
+                    }
+                ]),
+                tableView: tableView,
                 id: viewItem.order,
                 height: .heightCell48,
-                bind: { cell, _ in
+                bind: { cell in
                     cell.set(backgroundStyle: .transparent, isLast: isLast)
-                    cell.numberText = viewItem.order
-                    cell.title = viewItem.percent
-                    cell.set(address: viewItem.address)
-                    cell.onTapIcon = { [weak self] in
-                        self?.open(address: viewItem.address)
-                    }
-                }
-        )
-    }
-
-    private func footer(text: String) -> ViewState<BottomDescriptionHeaderFooterView> {
-        .cellType(
-                hash: "bottom_description",
-                binder: { view in
-                    view.bind(text: text)
-                },
-                dynamicHeight: { width in
-                    BottomDescriptionHeaderFooterView.height(containerWidth: width, text: text)
                 }
         )
     }
@@ -145,7 +148,6 @@ extension CoinMajorHoldersViewController: SectionsDataSource {
         return [
             Section(
                     id: "chart",
-                    footerState: footer(text: "coin_page.major_holders.description".localized),
                     rows: [
                         StaticRow(
                                 cell: chartCell,
@@ -159,7 +161,8 @@ extension CoinMajorHoldersViewController: SectionsDataSource {
             Section(
                     id: "holders",
                     footerState: .margin(height: .margin32),
-                    rows: [headerRow] + stateViewItem.viewItems.enumerated().map { row(viewItem: $1, isLast: $0 == stateViewItem.viewItems.count - 1) }
+                    rows: [tableView.subtitleRow(text: "coin_page.major_holders.top_ethereum_wallets".localized)]
+                            + stateViewItem.viewItems.enumerated().map { row(viewItem: $1, isLast: $0 == stateViewItem.viewItems.count - 1) }
             )
         ]
     }

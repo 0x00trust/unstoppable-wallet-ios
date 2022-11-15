@@ -3,7 +3,7 @@ import ThemeKit
 
 struct MarketTopModule {
 
-    static func viewController(marketTop: MarketModule.MarketTop = .top250, sortingField: MarketModule.SortingField = .highestCap, marketField: MarketModule.MarketField = .price) -> UIViewController {
+    static func viewController(marketTop: MarketModule.MarketTop = .top100, sortingField: MarketModule.SortingField = .highestCap, marketField: MarketModule.MarketField = .price) -> UIViewController {
         let service = MarketTopService(
                 marketKit: App.shared.marketKit,
                 currencyKit: App.shared.currencyKit,
@@ -17,11 +17,10 @@ struct MarketTopModule {
         )
 
         let decorator = MarketListMarketFieldDecorator(service: service)
-        let viewModel = MarketTopViewModel(service: service)
-        let listViewModel = MarketListViewModel(service: service, watchlistToggleService: watchlistToggleService, decorator: decorator)
+        let listViewModel = MarketListWatchViewModel(service: service, watchlistToggleService: watchlistToggleService, decorator: decorator)
         let headerViewModel = MarketMultiSortHeaderViewModel(service: service, decorator: decorator)
 
-        let viewController = MarketTopViewController(viewModel: viewModel, listViewModel: listViewModel, headerViewModel: headerViewModel)
+        let viewController = MarketTopViewController(listViewModel: listViewModel, headerViewModel: headerViewModel)
 
         return ThemeNavigationController(rootViewController: viewController)
     }

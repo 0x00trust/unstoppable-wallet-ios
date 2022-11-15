@@ -17,12 +17,14 @@ class FilterCard: UICollectionViewCell {
         super.init(frame: frame)
 
         contentView.cornerRadius = .margin12
+        contentView.layer.cornerCurve = .continuous
         contentView.borderWidth = .heightOneDp
         contentView.borderColor = .clear
 
         contentView.addSubview(iconImageView)
         iconImageView.snp.makeConstraints { maker in
             maker.leading.top.equalToSuperview().inset(FilterCard.sideMargin)
+            maker.size.equalTo(CGFloat.iconSize24)
         }
 
         contentView.addSubview(blockchainBadgeView)
@@ -41,7 +43,7 @@ class FilterCard: UICollectionViewCell {
         }
 
         titleLabel.font = FilterCard.titleFont
-        titleLabel.textColor = .themeOz
+        titleLabel.textColor = .themeLeah
 
         contentView.backgroundColor = .themeLawrence
     }
@@ -78,7 +80,7 @@ class FilterCard: UICollectionViewCell {
         let titleWidth = item.title.size(containerWidth: .greatestFiniteMagnitude, font: FilterCard.titleFont).width
         var badgeWidth: CGFloat = 0
         if let badgeText = item.blockchainBadge {
-            badgeWidth = BadgeView.width(for: badgeText, style: .small)
+            badgeWidth = BadgeView.width(for: badgeText, change: nil, style: .small)
             badgeWidth += iconAndBadgeMargin
         }
         let greaterWidth = max(titleWidth + 2 * FilterCard.sideMargin, iconWidth + badgeWidth + 2 * FilterCard.sideMargin)

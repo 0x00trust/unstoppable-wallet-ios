@@ -1,3 +1,4 @@
+import Foundation
 import FeeRateKit
 import RxSwift
 
@@ -45,12 +46,14 @@ class FeeRateProvider {
 }
 
 class BitcoinFeeRateProvider: ICustomRangedFeeRateProvider {
-    let customFeeRange: ClosedRange<Int> = 1...200
+    static let defaultFeeRange: ClosedRange<Int> = 1...200
+    let customFeeRange: ClosedRange<Int> = BitcoinFeeRateProvider.defaultFeeRange
+    let step: Int = 1
 
     private let feeRateProvider: FeeRateProvider
-    private let lowPriorityBlockCount = 40
-    private let mediumPriorityBlockCount = 8
-    private let highPriorityBlockCount = 2
+    private let lowPriorityBlockCount = 6
+    private let mediumPriorityBlockCount = 2
+    private let highPriorityBlockCount = 1
 
     init(feeRateProvider: FeeRateProvider) {
         self.feeRateProvider = feeRateProvider
@@ -59,7 +62,7 @@ class BitcoinFeeRateProvider: ICustomRangedFeeRateProvider {
     var feeRatePriorityList: [FeeRatePriority] {
         [
             .low,
-            .medium,
+            .recommended,
             .high,
             .custom(value: customFeeRange.lowerBound, range: customFeeRange)
         ]
@@ -67,15 +70,13 @@ class BitcoinFeeRateProvider: ICustomRangedFeeRateProvider {
     var recommendedFeeRate: Single<Int> { feeRateProvider.bitcoinFeeRate(blockCount: mediumPriorityBlockCount) }
 
     var defaultFeeRatePriority: FeeRatePriority {
-        .medium
+        .recommended
     }
 
     func feeRate(priority: FeeRatePriority) -> Single<Int> {
         switch priority {
         case .low:
             return feeRateProvider.bitcoinFeeRate(blockCount: lowPriorityBlockCount)
-        case .medium:
-            return feeRateProvider.bitcoinFeeRate(blockCount: mediumPriorityBlockCount)
         case .high:
             return feeRateProvider.bitcoinFeeRate(blockCount: highPriorityBlockCount)
         case .recommended:
@@ -108,64 +109,6 @@ class BitcoinCashFeeRateProvider: IFeeRateProvider {
 
     var recommendedFeeRate: Single<Int> { feeRateProvider.bitcoinCashFeeRate }
     var feeRatePriorityList: [FeeRatePriority] = []
-
-}
-
-class EthereumFeeRateProvider: ICustomRangedFeeRateProvider {
-    private static let customRange = 1_000_000_000...400_000_000_000
-
-    let customFeeRange: ClosedRange<Int>
-
-    private let feeRateProvider: FeeRateProvider
-    private let multiply: Double?
-
-    init(feeRateProvider: FeeRateProvider, customFeeRange: ClosedRange<Int> = EthereumFeeRateProvider.customRange, multiply: Double? = nil) {
-        self.feeRateProvider = feeRateProvider
-        self.multiply = multiply
-        self.customFeeRange = customFeeRange
-    }
-
-    var recommendedFeeRate: Single<Int> {
-        let lowerRange = customFeeRange.lowerBound
-
-        return feeRateProvider.ethereumGasPrice.map { [weak self] in
-            ceil(max(lowerRange, $0), multiply: self?.multiply)
-        }
-    }
-
-    var feeRatePriorityList: [FeeRatePriority] {
-        let lower = ceil(customFeeRange.lowerBound, multiply: multiply)
-        return [.recommended, .custom(value: lower, range: lower...customFeeRange.upperBound)]
-    }
-
-}
-
-class BinanceSmartChainFeeRateProvider: ICustomRangedFeeRateProvider {
-    private static let customRange = 1_000_000_000...400_000_000_000
-
-    let customFeeRange: ClosedRange<Int>
-
-    private let feeRateProvider: FeeRateProvider
-    private let multiply: Double?
-
-    init(feeRateProvider: FeeRateProvider, customFeeRange: ClosedRange<Int> = BinanceSmartChainFeeRateProvider.customRange, multiply: Double? = nil) {
-        self.feeRateProvider = feeRateProvider
-        self.multiply = multiply
-        self.customFeeRange = customFeeRange
-    }
-
-    var recommendedFeeRate: Single<Int> {
-        let lowerRange = customFeeRange.lowerBound
-
-        return feeRateProvider.binanceSmartChainGasPrice.map { [weak self] in
-            ceil(max(lowerRange, $0), multiply: self?.multiply)
-        }
-    }
-
-    var feeRatePriorityList: [FeeRatePriority] {
-        let lower = ceil(customFeeRange.lowerBound, multiply: multiply)
-        return [.recommended, .custom(value: lower, range: lower...customFeeRange.upperBound)]
-    }
 
 }
 

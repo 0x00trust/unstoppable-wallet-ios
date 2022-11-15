@@ -1,3 +1,5 @@
+import Foundation
+import UIKit
 import RxSwift
 import RxCocoa
 import SnapKit
@@ -13,7 +15,7 @@ class CoinInvestorsViewController: ThemeViewController {
 
     private let tableView = SectionsTableView(style: .grouped)
     private let spinner = HUDActivityView.create(with: .medium24)
-    private let errorView = MarketListErrorView()
+    private let errorView = PlaceholderViewModule.reachabilityView()
 
     private var viewItems: [CoinInvestorsViewModel.ViewItem]?
 
@@ -52,23 +54,22 @@ class CoinInvestorsViewController: ThemeViewController {
 
         view.addSubview(errorView)
         errorView.snp.makeConstraints { maker in
-            maker.edges.equalToSuperview()
+            maker.edges.equalTo(view.safeAreaLayoutGuide)
         }
 
-        errorView.onTapRetry = { [weak self] in self?.viewModel.refresh() }
+        errorView.configureSyncError(action: { [weak self] in self?.onRetry() })
 
         subscribe(disposeBag, viewModel.viewItemsDriver) { [weak self] in self?.sync(viewItems: $0) }
         subscribe(disposeBag, viewModel.loadingDriver) { [weak self] loading in
             self?.spinner.isHidden = !loading
         }
-        subscribe(disposeBag, viewModel.errorDriver) { [weak self] error in
-            if let error = error {
-                self?.errorView.text = error
-                self?.errorView.isHidden = false
-            } else {
-                self?.errorView.isHidden = true
-            }
+        subscribe(disposeBag, viewModel.syncErrorDriver) { [weak self] visible in
+            self?.errorView.isHidden = !visible
         }
+    }
+
+    @objc private func onRetry() {
+        viewModel.onTapRetry()
     }
 
     private func sync(viewItems: [CoinInvestorsViewModel.ViewItem]?) {
@@ -102,12 +103,14 @@ extension CoinInvestorsViewController: SectionsDataSource {
                                 cell.set(backgroundStyle: .transparent)
 
                                 cell.bind(index: 0) { (component: TextComponent) in
-                                    component.set(style: .b3)
+                                    component.font = .body
+                                    component.textColor = .themeJacob
                                     component.text = title
                                 }
 
                                 cell.bind(index: 1) { (component: TextComponent) in
-                                    component.set(style: .d1)
+                                    component.font = .subhead2
+                                    component.textColor = .themeGray
                                     component.text = value
                                 }
                             }
@@ -122,13 +125,15 @@ extension CoinInvestorsViewController: SectionsDataSource {
         }
 
         cell.bind(index: 1) { (component: TextComponent) in
-            component.set(style: .b2)
+            component.font = .body
+            component.textColor = .themeLeah
             component.text = fundViewItem.name
         }
 
         cell.bind(index: 2) { (component: TextComponent) in
             component.isHidden = !fundViewItem.isLead
-            component.set(style: .c4)
+            component.font = .subhead1
+            component.textColor = .themeRemus
             component.text = "coin_page.funds_invested.lead".localized
         }
     }

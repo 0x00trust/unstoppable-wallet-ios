@@ -1,12 +1,11 @@
 import RxSwift
 import RxRelay
-import WalletConnect
 
 class WalletConnectV2PendingRequestsService {
     private let disposeBag = DisposeBag()
 
     private let sessionManager: WalletConnectV2SessionManager
-    private let accountManager: IAccountManager
+    private let accountManager: AccountManager
 
     private let itemsRelay = PublishRelay<[Item]>()
     private(set) var items = [Item]() {
@@ -19,7 +18,7 @@ class WalletConnectV2PendingRequestsService {
 
     private let showPendingRequestRelay = PublishRelay<WalletConnectRequest>()
 
-    init(sessionManager: WalletConnectV2SessionManager, accountManager: IAccountManager) {
+    init(sessionManager: WalletConnectV2SessionManager, accountManager: AccountManager) {
         self.sessionManager = sessionManager
         self.accountManager = accountManager
 
@@ -66,7 +65,7 @@ class WalletConnectV2PendingRequestsService {
                                 id: request.id,
                                 sessionName: allSessions.first(where: { $0.topic == request.topic })?.peer.name ?? "",
                                 method: request.method,
-                                chainId: request.chainId
+                                chainId: request.chainId.reference
                         )
                     }
             ))

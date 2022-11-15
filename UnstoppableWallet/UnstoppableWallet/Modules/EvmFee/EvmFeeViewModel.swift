@@ -20,7 +20,9 @@ class EvmFeeViewModel {
         self.gasPriceService = gasPriceService
 
         sync(status: service.status)
-        subscribe(disposeBag, service.statusObservable) { [weak self] in self?.sync(status: $0) }
+        subscribe(disposeBag, service.statusObservable) { [weak self] in
+            self?.sync(status: $0)
+        }
     }
 
     private func sync(status: DataStatus<FallibleData<EvmFeeModule.Transaction>>) {
@@ -47,7 +49,7 @@ class EvmFeeViewModel {
             spinnerVisible = false
 
             let valueType: FeeCell.ValueType = fallibleTransaction.errors.isEmpty ? .regular : .error
-            value = FeeCell.Value(text: coinService.amountData(value: fallibleTransaction.data.gasData.fee).formattedString, type: valueType)
+            value = FeeCell.Value(text: coinService.amountData(value: fallibleTransaction.data.gasData.fee).formattedFull, type: valueType)
         }
 
         editButtonVisibleRelay.accept(editButtonVisible)
@@ -55,6 +57,10 @@ class EvmFeeViewModel {
         spinnerVisibleRelay.accept(spinnerVisible)
         valueRelay.accept(value)
     }
+
+}
+
+extension EvmFeeViewModel: IEditableFeeViewModel {
 
     var valueDriver: Driver<FeeCell.Value?> {
         valueRelay.asDriver()

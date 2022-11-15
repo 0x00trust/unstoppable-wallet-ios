@@ -12,7 +12,7 @@ class CoinOverviewViewModel {
 
     private let viewItemRelay = BehaviorRelay<ViewItem?>(value: nil)
     private let loadingRelay = BehaviorRelay<Bool>(value: false)
-    private let errorRelay = BehaviorRelay<String?>(value: nil)
+    private let syncErrorRelay = BehaviorRelay<Bool>(value: false)
 
     init(service: CoinOverviewService) {
         self.service = service
@@ -27,15 +27,15 @@ class CoinOverviewViewModel {
         case .loading:
             viewItemRelay.accept(nil)
             loadingRelay.accept(true)
-            errorRelay.accept(nil)
+            syncErrorRelay.accept(false)
         case .completed(let item):
             viewItemRelay.accept(viewItemFactory.viewItem(item: item, currency: service.currency, fullCoin: service.fullCoin))
             loadingRelay.accept(false)
-            errorRelay.accept(nil)
+            syncErrorRelay.accept(false)
         case .failed:
             viewItemRelay.accept(nil)
             loadingRelay.accept(false)
-            errorRelay.accept("market.sync_error".localized)
+            syncErrorRelay.accept(true)
         }
     }
 
@@ -51,19 +51,8 @@ extension CoinOverviewViewModel {
         loadingRelay.asDriver()
     }
 
-    var errorDriver: Driver<String?> {
-        errorRelay.asDriver()
-    }
-
-    var coinViewItem: CoinViewItem {
-        let fullCoin = service.fullCoin
-
-        return CoinViewItem(
-                name: fullCoin.coin.name,
-                marketCapRank: fullCoin.coin.marketCapRank.map { "#\($0)" },
-                imageUrl: fullCoin.coin.imageUrl,
-                imagePlaceholderName: fullCoin.placeholderImageName
-        )
+    var syncErrorDriver: Driver<Bool> {
+        syncErrorRelay.asDriver()
     }
 
     func onLoad() {
@@ -86,6 +75,8 @@ extension CoinOverviewViewModel {
     }
 
     struct ViewItem {
+        let coinViewItem: CoinViewItem
+
         let marketCapRank: String?
         let marketCap: String?
         let totalSupply: String?
@@ -104,9 +95,10 @@ extension CoinOverviewViewModel {
     }
 
     struct ContractViewItem {
-        let iconName: String
+        let iconUrl: String
+        let title: String
         let reference: String
-        let explorerUrl: String
+        let explorerUrl: String?
     }
 
     enum PerformanceViewItem {

@@ -1,4 +1,4 @@
-import Foundation
+import UIKit
 import RxSwift
 import RxRelay
 import RxCocoa
@@ -11,7 +11,7 @@ class CoinDetailsViewModel {
 
     private let viewItemRelay = BehaviorRelay<ViewItem?>(value: nil)
     private let loadingRelay = BehaviorRelay<Bool>(value: false)
-    private let errorRelay = BehaviorRelay<String?>(value: nil)
+    private let syncErrorRelay = BehaviorRelay<Bool>(value: false)
 
     private let ratioFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
@@ -35,43 +35,81 @@ class CoinDetailsViewModel {
         case .loading:
             viewItemRelay.accept(nil)
             loadingRelay.accept(true)
-            errorRelay.accept(nil)
+            syncErrorRelay.accept(false)
         case .completed(let item):
             viewItemRelay.accept(viewItem(item: item))
             loadingRelay.accept(false)
-            errorRelay.accept(nil)
+            syncErrorRelay.accept(false)
         case .failed:
             viewItemRelay.accept(nil)
             loadingRelay.accept(false)
-            errorRelay.accept("market.sync_error".localized)
+            syncErrorRelay.accept(true)
         }
     }
 
-    private func chart(values: [ChartPoint]?, badge: String? = nil) -> ChartViewItem? {
-        guard let values = values, let first = values.first, let last = values.last else {
-            return nil
+    private func chart(title: String, item: CoinDetailsService.ProData, isCurrencyValue: Bool = true) -> MarketCardView.ViewItem? {
+        switch item {
+        case .empty: return nil
+        case .forbidden: return MarketCardView.ViewItem(
+                title: title,
+                value: "***",
+                description: "coin_page.chart.locked".localized,
+                descriptionColor: .themeGray)
+        case .completed(let values):
+            guard let first = values.first, let last = values.last else {
+                return nil
+            }
+
+            let chartItems = values.map {
+                ChartItem(timestamp: $0.timestamp).added(name: .rate, value: $0.value)
+            }
+
+            let diffValue = (last.value / first.value - 1) * 100
+            let diff = DiffLabel.formatted(value: diffValue)
+            let diffColor = DiffLabel.color(value: diffValue)
+
+            let chartData = ChartData(items: chartItems, startTimestamp: first.timestamp, endTimestamp: last.timestamp)
+            let value = isCurrencyValue ?
+                    ValueFormatter.instance.formatShort(currency: service.currency, value: last.value) :
+                    ValueFormatter.instance.formatShort(value: last.value)
+
+            return MarketCardView.ViewItem(
+                    title: title,
+                    value: value,
+                    description: diff ?? "n/a".localized,
+                    descriptionColor: diffColor,
+                    chartData: chartData,
+                    movementTrend: diffValue.isSignMinus ? .down : .up
+            )
         }
+    }
 
-        let chartItems = values.map {
-            ChartItem(timestamp: $0.timestamp).added(name: .rate, value: $0.value)
-        }
+    private func tokenLiquidity(proFeatures: CoinDetailsService.ProFeatures) -> TokenLiquidityViewItem {
+        TokenLiquidityViewItem(
+                volume: chart(title: CoinProChartModule.ProChartType.volume.title, item: proFeatures.dexVolumes),
+                liquidity: chart(title: CoinProChartModule.ProChartType.liquidity.title, item: proFeatures.dexLiquidity)
+        )
+    }
 
-        let diff = (last.value / first.value - 1) * 100
-        let chartData = ChartData(items: chartItems, startTimestamp: first.timestamp, endTimestamp: last.timestamp)
-        let value = CurrencyCompactFormatter.instance.format(currency: service.currency, value: last.value)
-
-        return ChartViewItem(badge: badge, value: value, diff: diff, chartData: chartData, chartTrend: diff.isSignMinus ? .down : .up)
+    private func tokenDistribution(proFeatures: CoinDetailsService.ProFeatures) -> TokenDistributionViewItem {
+        TokenDistributionViewItem(
+                txCount: chart(title: CoinProChartModule.ProChartType.txCount.title, item: proFeatures.txCount, isCurrencyValue: false),
+                txVolume: chart(title: CoinProChartModule.ProChartType.txVolume.title, item: proFeatures.txVolume),
+                activeAddresses: chart(title: CoinProChartModule.ProChartType.activeAddresses.title, item: proFeatures.activeAddresses, isCurrencyValue: false)
+        )
     }
 
     private func viewItem(item: CoinDetailsService.Item) -> ViewItem {
         ViewItem(
+                proFeaturesActivated: item.proFeatures.activated,
+                tokenLiquidity: tokenLiquidity(proFeatures: item.proFeatures),
+                tokenDistribution: tokenDistribution(proFeatures: item.proFeatures),
                 hasMajorHolders: service.hasMajorHolders,
-                volumeChart: chart(values: item.totalVolumes, badge: service.coin.marketCapRank.map { "#\($0)" }),
-                tvlChart: chart(values: item.tvls),
+                tvlChart: chart(title: "coin_page.chart_tvl".localized, item: item.tvls.flatMap { .completed($0) } ?? .empty),
                 tvlRank: item.marketInfoDetails.tvlRank.map { "#\($0)" },
                 tvlRatio: item.marketInfoDetails.tvlRatio.flatMap { ratioFormatter.string(from: $0 as NSNumber) },
-                treasuries: item.marketInfoDetails.totalTreasuries.flatMap { CurrencyCompactFormatter.instance.format(currency: service.currency, value: $0) },
-                fundsInvested: item.marketInfoDetails.totalFundsInvested.flatMap { CurrencyCompactFormatter.instance.format(currency: service.usdCurrency, value: $0) },
+                treasuries: item.marketInfoDetails.totalTreasuries.flatMap { ValueFormatter.instance.formatShort(currency: service.currency, value: $0) },
+                fundsInvested: item.marketInfoDetails.totalFundsInvested.flatMap { ValueFormatter.instance.formatShort(currency: service.usdCurrency, value: $0) },
                 reportsCount: item.marketInfoDetails.reportsCount == 0 ? nil : "\(item.marketInfoDetails.reportsCount)",
                 securityViewItems: securityViewItems(info: item.marketInfoDetails),
                 auditAddresses: service.auditAddresses
@@ -98,12 +136,12 @@ class CoinDetailsViewModel {
         }
 
         if let kitResistant = info.confiscationResistant {
-            let resistance: SecurityResistance = kitResistant ? .yes : .no
+            let resistance: SecurityConfiscationResistance = kitResistant ? .yes : .no
             viewItems.append(SecurityViewItem(type: .confiscationResistance, value: resistance.title, valueGrade: resistance.grade))
         }
 
         if let kitResistant = info.censorshipResistant {
-            let resistance: SecurityResistance = kitResistant ? .yes : .no
+            let resistance: SecurityCensorshipResistance = kitResistant ? .yes : .no
             viewItems.append(SecurityViewItem(type: .censorshipResistance, value: resistance.title, valueGrade: resistance.grade))
         }
 
@@ -122,8 +160,8 @@ extension CoinDetailsViewModel {
         loadingRelay.asDriver()
     }
 
-    var errorDriver: Driver<String?> {
-        errorRelay.asDriver()
+    var syncErrorDriver: Driver<Bool> {
+        syncErrorRelay.asDriver()
     }
 
     var coin: Coin {
@@ -138,35 +176,16 @@ extension CoinDetailsViewModel {
         service.sync()
     }
 
-    func securityInfoViewItems(type: SecurityType) -> [SecurityInfoViewItem] {
-        switch type {
-        case .privacy:
-            return SecurityLevel.allCases.map { level in
-                SecurityInfoViewItem(grade: level.grade, title: level.title, text: "coin_page.security_parameters.privacy.description.\(level.rawValue)".localized)
-            }
-        case .issuance:
-            return SecurityIssuance.allCases.map { issuance in
-                SecurityInfoViewItem(grade: issuance.grade, title: issuance.title, text: "coin_page.security_parameters.issuance.description.\(issuance.rawValue)".localized)
-            }
-        case .confiscationResistance:
-            return SecurityResistance.allCases.map { resistance in
-                SecurityInfoViewItem(grade: resistance.grade, title: resistance.title, text: "coin_page.security_parameters.confiscation_resistance.description.\(resistance.rawValue)".localized)
-            }
-        case .censorshipResistance:
-            return SecurityResistance.allCases.map { resistance in
-                SecurityInfoViewItem(grade: resistance.grade, title: resistance.title, text: "coin_page.security_parameters.censorship_resistance.description.\(resistance.rawValue)".localized)
-            }
-        }
-    }
-
 }
 
 extension CoinDetailsViewModel {
 
     struct ViewItem {
+        let proFeaturesActivated: Bool
+        let tokenLiquidity: TokenLiquidityViewItem
+        let tokenDistribution: TokenDistributionViewItem
         let hasMajorHolders: Bool
-        let volumeChart: ChartViewItem?
-        let tvlChart: ChartViewItem?
+        let tvlChart: MarketCardView.ViewItem?
         let tvlRank: String?
         let tvlRatio: String?
         let treasuries: String?
@@ -174,6 +193,17 @@ extension CoinDetailsViewModel {
         let reportsCount: String?
         let securityViewItems: [SecurityViewItem]
         let auditAddresses: [String]
+    }
+
+    struct TokenLiquidityViewItem {
+        let volume: MarketCardView.ViewItem?
+        let liquidity: MarketCardView.ViewItem?
+    }
+
+    struct TokenDistributionViewItem {
+        let txCount: MarketCardView.ViewItem?
+        let txVolume: MarketCardView.ViewItem?
+        let activeAddresses: MarketCardView.ViewItem?
     }
 
     struct SecurityViewItem {
@@ -197,6 +227,10 @@ extension CoinDetailsViewModel {
             "coin_page.security_parameters.level.\(rawValue)".localized
         }
 
+        var description: String {
+            "coin_page.security_parameters.privacy.description.\(rawValue)".localized
+        }
+
         var grade: SecurityGrade {
             switch self {
             case .low: return .low
@@ -214,6 +248,10 @@ extension CoinDetailsViewModel {
             "coin_page.security_parameters.issuance.\(rawValue)".localized
         }
 
+        var description: String {
+            "coin_page.security_parameters.issuance.description.\(rawValue)".localized
+        }
+
         var grade: SecurityGrade {
             switch self {
             case .decentralized: return .high
@@ -222,12 +260,36 @@ extension CoinDetailsViewModel {
         }
     }
 
-    enum SecurityResistance: String, CaseIterable {
+    enum SecurityConfiscationResistance: String, CaseIterable {
         case yes
         case no
 
         var title: String {
             "coin_page.security_parameters.resistance.\(rawValue)".localized
+        }
+
+        var description: String {
+            "coin_page.security_parameters.confiscation_resistance.description.\(rawValue)".localized
+        }
+
+        var grade: SecurityGrade {
+            switch self {
+            case .yes: return .high
+            case .no: return .low
+            }
+        }
+    }
+
+    enum SecurityCensorshipResistance: String, CaseIterable {
+        case yes
+        case no
+
+        var title: String {
+            "coin_page.security_parameters.resistance.\(rawValue)".localized
+        }
+
+        var description: String {
+            "coin_page.security_parameters.censorship_resistance.description.\(rawValue)".localized
         }
 
         var grade: SecurityGrade {
@@ -261,11 +323,27 @@ extension CoinDetailsViewModel {
     }
 
     struct ChartViewItem {
-        let badge: String?
         let value: String?
-        let diff: Decimal?
+        let diff: String
+        let diffColor: UIColor
         let chartData: ChartData?
         let chartTrend: MovementTrend
+    }
+
+}
+
+extension ChartData {
+
+    static var placeholder: ChartData {
+        let chartItems = [
+            ChartItem(timestamp: 100).added(name: .rate, value: 2),
+            ChartItem(timestamp: 200).added(name: .rate, value: 2),
+            ChartItem(timestamp: 300).added(name: .rate, value: 1),
+            ChartItem(timestamp: 400).added(name: .rate, value: 3),
+            ChartItem(timestamp: 500).added(name: .rate, value: 2),
+            ChartItem(timestamp: 600).added(name: .rate, value: 2)
+        ]
+        return ChartData(items: chartItems, startTimestamp: 100, endTimestamp: 600)
     }
 
 }

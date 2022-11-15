@@ -6,14 +6,14 @@ import RxSwift
 class SendAvailableBalanceCell: UITableViewCell {
     let cellHeight: CGFloat = 29
 
-    private let viewModel: SendAvailableBalanceViewModel
+    private let viewModel: ISendAvailableBalanceViewModel
     private let disposeBag = DisposeBag()
 
     private let availableAmountTitleLabel = UILabel()
     private let availableAmountValueLabel = UILabel()
     private let spinner = HUDActivityView.create(with: .small20)
 
-    init(viewModel: SendAvailableBalanceViewModel) {
+    init(viewModel: ISendAvailableBalanceViewModel) {
         self.viewModel = viewModel
 
         super.init(style: .default, reuseIdentifier: nil)
@@ -33,7 +33,7 @@ class SendAvailableBalanceCell: UITableViewCell {
         contentView.addSubview(availableAmountValueLabel)
         availableAmountValueLabel.font = .subhead1
 
-        availableAmountValueLabel.textColor = .themeOz
+        availableAmountValueLabel.textColor = .themeLeah
         availableAmountValueLabel.snp.makeConstraints { maker in
             maker.centerY.equalToSuperview()
             maker.trailing.equalToSuperview().inset(CGFloat.margin16)
@@ -55,8 +55,10 @@ class SendAvailableBalanceCell: UITableViewCell {
     private func sync(viewState: SendAvailableBalanceViewModel.ViewState) {
         if case .loading = viewState {
             spinner.isHidden = false
+            spinner.startAnimating()
         } else {
             spinner.isHidden = true
+            spinner.stopAnimating()
         }
 
         if case .loaded(let value) = viewState {

@@ -2,21 +2,21 @@ import Foundation
 import MarketKit
 import RxSwift
 import RxRelay
-import EthereumKit
+import EvmKit
 import OneInchKit
 import BigInt
 
 struct OneInchSwapParameters: Equatable {
-    let platformCoinFrom: PlatformCoin
-    let platformCoinTo: PlatformCoin
+    let tokenFrom: MarketKit.Token
+    let tokenTo: MarketKit.Token
     let amountFrom: Decimal
     var amountTo: Decimal
     let slippage: Decimal
     let recipient: Address?
 
     static func ==(lhs: OneInchSwapParameters, rhs: OneInchSwapParameters) -> Bool {
-        lhs.platformCoinFrom == rhs.platformCoinFrom &&
-        lhs.platformCoinTo == rhs.platformCoinTo &&
+        lhs.tokenFrom == rhs.tokenFrom &&
+        lhs.tokenTo == rhs.tokenTo &&
         lhs.amountFrom == rhs.amountFrom &&
         lhs.amountTo == rhs.amountTo &&
         lhs.slippage == rhs.slippage &&
@@ -33,7 +33,7 @@ class OneInchFeeService {
 
     private static let gasLimitSurchargePercent = 25
 
-    private let evmKit: EthereumKit.Kit
+    private let evmKit: EvmKit.Kit
     private let provider: OneInchProvider
     private let gasPriceService: IGasPriceService
     private(set) var parameters: OneInchSwapParameters
@@ -47,7 +47,7 @@ class OneInchFeeService {
 
     var amountTo: Decimal?
 
-    init(evmKit: EthereumKit.Kit, provider: OneInchProvider, gasPriceService: IGasPriceService, parameters: OneInchSwapParameters) {
+    init(evmKit: EvmKit.Kit, provider: OneInchProvider, gasPriceService: IGasPriceService, parameters: OneInchSwapParameters) {
         self.evmKit = evmKit
         self.provider = provider
         self.gasPriceService = gasPriceService
@@ -72,10 +72,11 @@ class OneInchFeeService {
     private func sync(fallibleGasPrice: FallibleData<GasPrice>) {
         disposeBag = DisposeBag()
 
-        let recipient: EthereumKit.Address? = parameters.recipient.flatMap { try? EthereumKit.Address(hex: $0.raw) }
+        let recipient: EvmKit.Address? = parameters.recipient.flatMap { try? EvmKit.Address(hex: $0.raw) }
 
-        provider.swapSingle(platformCoinFrom: parameters.platformCoinFrom,
-                        platformCoinTo: parameters.platformCoinTo,
+        provider.swapSingle(
+                        tokenFrom: parameters.tokenFrom,
+                        tokenTo: parameters.tokenTo,
                         amount: parameters.amountFrom,
                         recipient: recipient,
                         slippage: parameters.slippage,
@@ -109,12 +110,12 @@ class OneInchFeeService {
     private func sync(swap: OneInchKit.Swap, fallibleGasPrice: FallibleData<GasPrice>) {
         let tx = swap.transaction
         let gasData = EvmFeeModule.GasData(
-                gasLimit: surchargedGasLimit(gasLimit: surchargedGasLimit(gasLimit: tx.gasLimit)),
-                gasPrice: fallibleGasPrice.data
+                limit: surchargedGasLimit(gasLimit: surchargedGasLimit(gasLimit: tx.gasLimit)),
+                price: fallibleGasPrice.data
         )
 
         parameters.amountTo = swap.amountOut ?? 0
-        let transactionData = EthereumKit.TransactionData(to: tx.to, value: tx.value, input: tx.data)
+        let transactionData = EvmKit.TransactionData(to: tx.to, value: tx.value, input: tx.data)
         let totalAmount = transactionData.value + gasData.fee
         var errors: [Error] = fallibleGasPrice.errors
 

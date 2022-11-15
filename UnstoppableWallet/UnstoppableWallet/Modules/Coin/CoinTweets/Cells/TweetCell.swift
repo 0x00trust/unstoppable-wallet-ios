@@ -43,7 +43,8 @@ class TweetCell: BaseSelectableThemeCell {
             maker.height.width.equalTo(CGFloat.iconSize24)
         }
 
-        titleImage.cornerRadius = 12
+        titleImage.cornerRadius = .cornerRadius12
+        titleImage.layer.cornerCurve = .continuous
 
         headerView.addSubview(titleLabel)
         titleLabel.snp.makeConstraints { maker in
@@ -53,7 +54,7 @@ class TweetCell: BaseSelectableThemeCell {
         }
 
         titleLabel.font = .body
-        titleLabel.textColor = .themeOz
+        titleLabel.textColor = .themeLeah
 
         headerView.addSubview(subTitleLabel)
         subTitleLabel.snp.makeConstraints { maker in
@@ -96,7 +97,7 @@ class TweetCell: BaseSelectableThemeCell {
         
         for entity in TwitterText.entities(in: viewItem.text) {
             switch entity.type {
-                case .url, .hashtag, .screenName, .listname: attributedString.addAttribute(.foregroundColor, value: UIColor.themeIssykBlue, range: entity.range)
+                case .url, .hashtag, .screenName, .listname: attributedString.addAttribute(.foregroundColor, value: UIColor.themeLaguna, range: entity.range)
             default: ()
             }
         }

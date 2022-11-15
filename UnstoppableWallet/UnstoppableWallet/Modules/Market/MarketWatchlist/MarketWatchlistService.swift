@@ -13,6 +13,7 @@ class MarketWatchlistService: IMarketMultiSortHeaderService {
     private let marketKit: MarketKit.Kit
     private let currencyKit: CurrencyKit.Kit
     private let favoritesManager: FavoritesManager
+    private let appManager: IAppManager
     private let storage: StorageKit.ILocalStorage
     private let disposeBag = DisposeBag()
     private var syncDisposeBag = DisposeBag()
@@ -37,6 +38,7 @@ class MarketWatchlistService: IMarketMultiSortHeaderService {
         self.marketKit = marketKit
         self.currencyKit = currencyKit
         self.favoritesManager = favoritesManager
+        self.appManager = appManager
         self.storage = storage
 
         if let rawValue: Int = storage.value(for: keySortingField), let sortingField = MarketModule.SortingField(rawValue: rawValue) {
@@ -44,12 +46,6 @@ class MarketWatchlistService: IMarketMultiSortHeaderService {
         } else {
             sortingField = .highestCap
         }
-
-        subscribe(disposeBag, favoritesManager.coinUidsUpdatedObservable) { [weak self] in self?.syncCoinUids() }
-        subscribe(disposeBag, currencyKit.baseCurrencyUpdatedObservable) { [weak self] _ in self?.syncMarketInfos() }
-        subscribe(disposeBag, appManager.willEnterForegroundObservable) { [weak self] in self?.syncMarketInfos() }
-
-        syncCoinUids()
     }
 
     private func syncCoinUids() {
@@ -82,7 +78,7 @@ class MarketWatchlistService: IMarketMultiSortHeaderService {
         }
 
         marketKit.marketInfosSingle(coinUids: coinUids, currencyCode: currency.code)
-                .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .userInitiated))
+                .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .utility))
                 .subscribe(onSuccess: { [weak self] marketInfos in
                     self?.sync(marketInfos: marketInfos)
                 }, onError: { [weak self] error in
@@ -111,6 +107,14 @@ extension MarketWatchlistService: IMarketListService {
         stateRelay.asObservable()
     }
 
+    func load() {
+        subscribe(disposeBag, favoritesManager.coinUidsUpdatedObservable) { [weak self] in self?.syncCoinUids() }
+        subscribe(disposeBag, currencyKit.baseCurrencyUpdatedObservable) { [weak self] _ in self?.syncMarketInfos() }
+        subscribe(disposeBag, appManager.willEnterForegroundObservable) { [weak self] in self?.syncMarketInfos() }
+
+        syncCoinUids()
+    }
+
     func refresh() {
         syncMarketInfos()
     }
@@ -131,12 +135,8 @@ extension MarketWatchlistService: IMarketListCoinUidService {
 
 extension MarketWatchlistService: IMarketListDecoratorService {
 
-    var initialMarketField: MarketModule.MarketField {
-        if let rawValue: Int = storage.value(for: keyMarketField), let marketField = MarketModule.MarketField(rawValue: rawValue) {
-            return marketField
-        }
-
-        return .price
+    var initialMarketFieldIndex: Int {
+        storage.value(for: keyMarketField) ?? 0
     }
 
     var currency: Currency {
@@ -147,12 +147,12 @@ extension MarketWatchlistService: IMarketListDecoratorService {
         .day
     }
 
-    func onUpdate(marketField: MarketModule.MarketField) {
+    func onUpdate(marketFieldIndex: Int) {
         if case .loaded(let marketInfos, _, _) = state {
             stateRelay.accept(.loaded(items: marketInfos, softUpdate: false, reorder: false))
         }
 
-        storage.set(value: marketField.rawValue, for: keyMarketField)
+        storage.set(value: marketFieldIndex, for: keyMarketField)
     }
 
 }
